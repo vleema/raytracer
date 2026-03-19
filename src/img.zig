@@ -1,0 +1,211 @@
+// TODO: Document this properly.
+
+const std = @import("std");
+const xml = @import("xml");
+
+pub const Scene = struct {
+    camera: struct {} = .{},
+    film: Film = .{},
+    world: World = .{},
+
+    pub fn fromFile(file: std.fs.File) !Scene {
+        var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
+        defer arena.deinit();
+        const arena_allocator = arena.allocator();
+
+        const md = try file.stat();
+        const mmap = try std.posix.mmap(null, md.size, std.posix.PROT.READ, .{ .TYPE = .PRIVATE }, file.handle, 0);
+        defer std.posix.munmap(mmap);
+        const root = try xml.parse(mmap, arena_allocator);
+
+        var scene: Scene = .{};
+        var node = root.values.first;
+        while (node) |n| {
+            const elem: *xml.Element = @fieldParentPtr("node", n);
+            node = n.next;
+            if (std.mem.eql(u8, elem.key, "camera"))
+                std.log.warn("camera tag still not supported", .{})
+            else if (std.mem.eql(u8, elem.key, "film"))
+                scene.film = try @TypeOf(scene.film).fromXml(elem)
+            else if (std.mem.eql(u8, elem.key, "world_begin"))
+                scene.world, node = try @TypeOf(scene.world).fromXml(elem)
+            else {
+                std.log.err("unrecognized option {s}", .{elem.key});
+                return error.UnrecognizedOption;
+            }
+        }
+        return scene;
+    }
+
+    pub fn backgroundPixel(self: *const @This(), pt: Point(2)) Color {
+        return switch (self.world.background) {
+            .single_color => |b| b.color,
+            .four_colors => |b| bilerp(
+                .{ .pos = .{ 0, 0 }, .color = b.tl },
+                .{ .pos = .{ self.film.x_res, 0 }, .color = b.tr },
+                .{ .pos = .{ 0, self.film.y_res }, .color = b.bl },
+                .{ .pos = .{ self.film.x_res, self.film.y_res }, .color = b.br },
+                pt,
+            ),
+        };
+    }
+};
+
+pub const Film = struct {
+    typ: enum { image } = .image,
+    x_res: usize = 400,
+    y_res: usize = 200,
+    filename: []const u8 = "out.ppm",
+    img_type: enum { ppm } = .ppm,
+
+    const film_log = std.log.scoped(.film);
+    var filename_buf: [256]u8 = undefined;
+
+    fn fromXml(elem: *const xml.Element) !@This() {
+        var film = @This(){};
+
+        if (elem.queryAttribute("type", null)) |typ| {
+            if (std.mem.eql(u8, "image", typ))
+                film.typ = .image
+            else
+                return error.InvalidFilmType;
+        }
+
+        if (elem.queryAttribute("x_res", null)) |x|
+            film.x_res = try std.fmt.parseUnsigned(usize, x, 10);
+
+        if (elem.queryAttribute("y_res", null)) |y|
+            film.y_res = try std.fmt.parseUnsigned(usize, y, 10);
+
+        if (elem.queryAttribute("filename", null)) |n| {
+            std.mem.copyForwards(u8, &filename_buf, n);
+            film.filename = filename_buf[0..n.len];
+        }
+
+        if (elem.queryAttribute("img_type", null)) |typ| {
+            if (std.mem.eql(u8, "ppm", typ))
+                film.img_type = .ppm
+            else
+                return error.InvalidImgType;
+        }
+
+        return film;
+    }
+};
+
+pub const World = struct {
+    background: Background = .{ .single_color = .{} },
+
+    const world_log = std.log.scoped(.world);
+
+    fn fromXml(elem: *const xml.Element) !struct { @This(), ?*std.DoublyLinkedList.Node } {
+        var world = @This(){};
+        var iter = elem;
+        return while (iter.nextSiblingElement()) |next| {
+            defer iter = next;
+            if (std.mem.eql(u8, next.key, "world_end")) {
+                break .{ world, next.node.next };
+            }
+            if (std.mem.eql(u8, next.key, "background")) {
+                world.background = try @TypeOf(world.background).fromXml(next);
+            } else {
+                world_log.err("expected 'background' tag, found {s}", .{next.key});
+                break error.UnknownTag;
+            }
+        } else blk: {
+            world_log.err("expected 'world_end' tag after 'world_begin'", .{});
+            break :blk error.ExpectedWorldEnd;
+        };
+    }
+};
+
+pub const Background = union(enum) {
+    single_color: struct {
+        color: Color = .{},
+    },
+    four_colors: struct {
+        tl: Color = .{},
+        tr: Color = .{},
+        bl: Color = .{},
+        br: Color = .{},
+    },
+
+    const background_log = std.log.scoped(.background);
+
+    fn fromXml(elem: *const xml.Element) !@This() {
+        const typ = elem.queryAttribute("type", null) orelse return error.ExpectedBackgroundType;
+        if (std.mem.eql(u8, typ, "single_color")) {
+            return .{
+                .single_color = .{
+                    .color = try .fromStr(elem.queryAttribute("color", null)),
+                },
+            };
+        } else if (std.mem.eql(u8, typ, "4_colors")) {
+            return .{
+                .four_colors = .{
+                    .tl = try .fromStr(elem.queryAttribute("tl", null)),
+                    .tr = try .fromStr(elem.queryAttribute("tr", null)),
+                    .bl = try .fromStr(elem.queryAttribute("bl", null)),
+                    .br = try .fromStr(elem.queryAttribute("br", null)),
+                },
+            };
+        } else {
+            background_log.err("expected one of ['single_color', '4_colors'], found {s}", .{typ});
+            return error.InvalidBackgroundType;
+        }
+    }
+};
+
+pub const Pixel = struct {
+    pos: Point(2),
+    color: Color,
+};
+
+fn bilerp(tl: Pixel, tr: Pixel, bl: Pixel, br: Pixel, pos: Point(2)) Color {
+    const horizontal_factor = factor(@floatFromInt(tl.pos[0]), @floatFromInt(tr.pos[0]), @floatFromInt(pos[0]));
+    const vertical_factor = factor(@floatFromInt(tl.pos[1]), @floatFromInt(bl.pos[1]), @floatFromInt(pos[1]));
+    const top = tl.color.lerp(tr.color, horizontal_factor);
+    const bot = bl.color.lerp(br.color, horizontal_factor);
+    return top.lerp(bot, vertical_factor);
+}
+
+fn factor(x1: f64, x2: f64, x: f64) f64 {
+    return (x - x1) / (x2 - x1);
+}
+
+pub const Color = struct {
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+
+    // TODO: Add support for hexadecimal values.
+    fn fromStr(str: ?[]const u8) !@This() {
+        if (str == null or str.?.len == 0) return .{};
+        var it = std.mem.splitScalar(u8, str.?, ' ');
+        return .{
+            .r = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedRedColor, 10),
+            .g = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedGreenColor, 10),
+            .b = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedBlueColor, 10),
+        };
+    }
+
+    fn interpolate(x: u8, y: u8, f: f64) u8 {
+        if (f > 1 or f < 0) std.debug.panic(
+            "lerp: the blend factor in lerp cannot be outside [0,1] range, found {any}",
+            .{f},
+        );
+        return @as(u8, @intFromFloat((1.0 - f) * @as(f64, @floatFromInt(x)) + f * @as(f64, @floatFromInt(y))));
+    }
+
+    fn lerp(self: @This(), other: @This(), f: f64) @This() {
+        return @This(){
+            .r = interpolate(self.r, other.r, f),
+            .g = interpolate(self.g, other.g, f),
+            .b = interpolate(self.b, other.b, f),
+        };
+    }
+};
+
+pub fn Point(N: comptime_int) type {
+    return @Vector(N, usize);
+}
