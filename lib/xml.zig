@@ -1,3 +1,6 @@
+// TODO: Report errors with line numbers.
+// TODO: Possibly add proper support for text inside elements.
+
 const std = @import("std");
 const List = std.DoublyLinkedList;
 
