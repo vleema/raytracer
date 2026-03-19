@@ -1,4 +1,165 @@
 const std = @import("std");
+const List = std.DoublyLinkedList;
+
+/// Represents the key value pair of an XML Element attribute.
+pub const Attribute = struct {
+    /// Represents the identifier of a value in a XML tag, e.g.:
+    ///
+    ///  `<tag attr="hi dad">`.
+    ///       ^ key `attr`
+    key: []const u8,
+
+    /// Represents the value attribute in a XML tag, e.g.:
+    ///
+    ///  `<tag attr="hi mom">`.
+    ///             ^ value `hi mom`
+    value: []const u8,
+
+    /// The node to the list where this Element belongs to.
+    node: List.Node = .{},
+};
+
+/// Represents a element inside a XML document, e.g.:
+///
+/// ```xml
+///  <world>
+///      <sky/>
+///      <earth>...</earth>
+///  </world>
+/// ```
+pub const Element = struct {
+    const Self = @This();
+
+    /// Represents the main identifier of a xml tag,
+    ///
+    ///  `<tag attr="hi dad">`.
+    ///    ^ tag `tag`
+    key: []const u8,
+
+    /// The list of attributes that a xml element has.
+    ///
+    /// `<film type="image" x_res="200" y_res="100"/>`
+    ///        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ///        attributes
+    attrs: List = .{},
+
+    /// The list of child element that a xml element has.
+    ///
+    /// ```xml
+    /// <world>
+    ///      <sky/>
+    ///      ^ child element of `world`
+    ///      <earth>...</earth>
+    ///  </world>
+    /// ```
+    values: List = .{},
+
+    /// The node to the list where this Element belongs to.
+    node: List.Node = .{},
+
+    /// Deinitializes the xml Element by deallocating every attribute and every element that it has.
+    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+        while (self.attrs.popFirst()) |n| {
+            const ptr: *Attribute = @fieldParentPtr("node", n);
+            allocator.destroy(ptr);
+        }
+        while (self.values.popFirst()) |n| {
+            const ptr: *Element = @fieldParentPtr("node", n);
+            ptr.deinit(allocator);
+            allocator.destroy(ptr);
+        }
+    }
+};
+
+pub const ParseError = error{
+    ShouldStartWithElement,
+    ExpectedIdentifier,
+    ExpectedAssign,
+    ExpectedLiteral,
+    ExpectedTagStart,
+    ExpectedClosingTag,
+    ExpectedTagEnd,
+    InvalidClosingTag,
+};
+
+/// Parses a UTF-8 encoded string into a Xml Document.
+pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
+    // Skips UTF-8 BOM if present.
+    const content_start: usize = if (std.mem.startsWith(u8, str, "\xEF\xBB\xBF")) 3 else 0;
+
+    var lexer = try Lexer.init(str[content_start..]);
+    _ = lexer.expectPeek(.tag_start) orelse return ParseError.ShouldStartWithElement;
+
+    const elem = (try parseElement(&lexer, allocator)) orelse unreachable;
+
+    return elem;
+}
+
+fn parseElement(lexer: *Lexer, allocator: std.mem.Allocator) !?Element {
+    _ = lexer.expectPeek(.tag_start) orelse return null;
+    _ = lexer.next();
+
+    var elem = Element{ .key = "" };
+    elem.key = (lexer.expectNext(.{ .identifier = "" }) orelse
+        return ParseError.ExpectedIdentifier)
+        .identifier;
+
+    elem.attrs = try parseAttributes(lexer, allocator);
+
+    if (lexer.expectPeek(.self_close)) |_| {
+        _ = lexer.next();
+        return elem;
+    }
+
+    _ = lexer.expectNext(.tag_end) orelse return ParseError.ExpectedTagEnd;
+
+    while (try parseElement(lexer, allocator)) |child| {
+        const ptr = try allocator.create(Element);
+        ptr.* = child;
+        elem.values.append(&ptr.node);
+    }
+
+    _ = lexer.expectNext(.end_tag_start) orelse return ParseError.ExpectedTagEnd;
+
+    const end_tag = lexer.expectNext(.{ .identifier = "" }) orelse
+        return ParseError.ExpectedIdentifier;
+
+    if (!std.mem.eql(u8, end_tag.identifier, elem.key))
+        return ParseError.InvalidClosingTag;
+
+    _ = lexer.expectNext(.tag_end) orelse
+        return ParseError.ExpectedTagEnd;
+
+    return elem;
+}
+
+fn parseAttributes(lexer: *Lexer, allocator: std.mem.Allocator) !List {
+    var attrs = List{};
+    while (try parseAttribute(lexer)) |attr| {
+        const ptr = try allocator.create(Attribute);
+        ptr.* = attr;
+        attrs.append(&ptr.node);
+    }
+    return attrs;
+}
+
+fn parseAttribute(lexer: *Lexer) !?Attribute {
+    var attr = Attribute{
+        .key = "",
+        .value = "",
+        .node = List.Node{},
+    };
+
+    _ = lexer.expectPeek(.{ .identifier = "" }) orelse return null;
+    attr.key = lexer.next().?.identifier;
+
+    _ = lexer.expectNext(.eq) orelse return ParseError.ExpectedAssign;
+    attr.value = (lexer.expectNext(.{ .literal = "" }) orelse
+        return ParseError.ExpectedLiteral)
+        .literal;
+
+    return attr;
+}
 
 const Token = union(enum) {
     illegal,
@@ -200,3 +361,88 @@ test "lexer test" {
     }
 }
 
+test "parser test" {
+    const str =
+        \\<R3>
+        \\  <film type="image" x_res="200" y_res="100" filename="simple_bkg.ppm" img_type="ppm" />
+        \\  <world>
+        \\      <background type="single_color"/>
+        \\  </world>
+        \\</R3>
+    ;
+
+    // film
+    var film_type = Attribute{ .key = "type", .value = "image" };
+    var film_xres = Attribute{ .key = "x_res", .value = "200" };
+    var film_yres = Attribute{ .key = "y_res", .value = "100" };
+    var film_fname = Attribute{ .key = "filename", .value = "simple_bkg.ppm" };
+    var film_itype = Attribute{ .key = "img_type", .value = "ppm" };
+    var film = Element{ .key = "film" };
+    film.attrs.append(&film_type.node);
+    film.attrs.append(&film_xres.node);
+    film.attrs.append(&film_yres.node);
+    film.attrs.append(&film_fname.node);
+    film.attrs.append(&film_itype.node);
+
+    // background (child of world)
+    var bg_type = Attribute{ .key = "type", .value = "single_color" };
+    var background = Element{ .key = "background" };
+    background.attrs.append(&bg_type.node);
+
+    // world
+    var world = Element{ .key = "world" };
+    world.values.append(&background.node);
+
+    // root
+    var expected = Element{ .key = "R3" };
+    expected.values.append(&film.node);
+    expected.values.append(&world.node);
+
+    // compare
+    var elem = try parse(str, std.testing.allocator);
+    defer elem.deinit(std.testing.allocator);
+    try expectEqualElements(expected, elem);
+}
+
+fn expectEqualElements(expected: Element, actual: Element) !void {
+    try std.testing.expectEqualStrings(expected.key, actual.key);
+    try expectEqualAttrLists(expected.attrs, actual.attrs);
+    try expectEqualValueLists(expected.values, actual.values);
+}
+
+fn expectEqualAttrLists(
+    expected: List,
+    actual: List,
+) !void {
+    try std.testing.expectEqual(expected.len(), actual.len());
+    var e = expected.first;
+    var a = actual.first;
+    while (e != null and a != null) : ({
+        e = e.?.next;
+        a = a.?.next;
+    }) {
+        const ea: *Attribute = @fieldParentPtr("node", e.?);
+        const aa: *Attribute = @fieldParentPtr("node", a.?);
+        try std.testing.expectEqualStrings(ea.key, aa.key);
+        try std.testing.expectEqualStrings(ea.value, aa.value);
+    }
+}
+
+fn expectEqualValueLists(
+    expected: List,
+    actual: List,
+) !void {
+    try std.testing.expectEqual(expected.len(), actual.len());
+    var e = expected.first;
+    var a = actual.first;
+    while (e != null and a != null) : ({
+        e = e.?.next;
+        a = a.?.next;
+    }) {
+        const ee: *Element = @fieldParentPtr("node", e.?);
+        const ae: *Element = @fieldParentPtr("node", a.?);
+        try std.testing.expectEqualStrings(ee.key, ae.key);
+        try expectEqualAttrLists(ee.attrs, ae.attrs);
+        try expectEqualValueLists(ee.values, ae.values);
+    }
+}
