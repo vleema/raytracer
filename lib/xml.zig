@@ -17,6 +17,29 @@ pub const Attribute = struct {
 
     /// The node to the list where this Element belongs to.
     node: List.Node = .{},
+
+    /// Formats attribute as following:
+    /// ```
+    /// .{
+    ///   .key = "attr",
+    ///   .value = "value",
+    /// }
+    /// ```
+    pub fn format(self: *const @This(), writer: *std.Io.Writer) !void {
+        var buf: [256]u8 = undefined;
+        @memset(&buf, ' ');
+        try fmt(self, writer, 0, buf);
+    }
+
+    fn fmt(attr: *const Attribute, w: *std.Io.Writer, indent: u8, buf: [256]u8) !void {
+        var newindent = indent;
+        try w.print("{s}.{{\n", .{buf[0..newindent]});
+        newindent += 2;
+        try w.print("{s}.key = \"{s}\",\n", .{ buf[0..newindent], attr.key });
+        try w.print("{s}.value = \"{s}\",\n", .{ buf[0..newindent], attr.value });
+        newindent -= 2;
+        try w.print("{s} }}", .{buf[0..newindent]});
+    }
 };
 
 /// Represents a element inside a XML document, e.g.:
@@ -68,6 +91,81 @@ pub const Element = struct {
             ptr.deinit(allocator);
             allocator.destroy(ptr);
         }
+    }
+
+    /// Fetches the first child element that has the specified key `key`.
+    pub fn firstChildElement(self: *const Self, key: []const u8) ?*const Element {
+        var node = self.values.first;
+        return while (node) |n| {
+            const v: *Element = @fieldParentPtr("node", n);
+            if (std.mem.eql(u8, v.key, key)) break v;
+            node = n.next;
+        } else null;
+    }
+
+    /// Fetches the next sibling in the list where the element belongs to.
+    pub fn nextSiblingElement(self: *const Self) ?*const Element {
+        const next = self.node.next orelse return null;
+        return @fieldParentPtr("node", next);
+    }
+
+    /// Queries the key and optionally value of an attribute inside the xml element.
+    pub fn queryAttribute(self: *const Self, key: []const u8, value: ?[]const u8) ?[]const u8 {
+        var node = self.attrs.first;
+        return while (node) |n| {
+            const a: *Attribute = @fieldParentPtr("node", n);
+            if (std.mem.eql(u8, a.key, key) and
+                (value == null or
+                    std.mem.eql(u8, value.?, a.value))) return a.value;
+            node = n.next;
+        } else null;
+    }
+
+    pub fn format(self: *const Element, writer: *std.Io.Writer) !void {
+        var buf: [256]u8 = undefined;
+        @memset(&buf, ' ');
+        try fmt(self, writer, 0, buf);
+    }
+
+    fn fmt(self: *const Element, w: *std.Io.Writer, indent: u8, buf: [256]u8) !void {
+        var newindent = indent;
+        try w.print("{s}.{{ \n", .{buf[0..newindent]});
+
+        newindent += 2;
+        try w.print("{s}.key = \"{s}\",\n", .{ buf[0..newindent], self.key });
+
+        try w.print("{s}.attrs = &.{{", .{buf[0..newindent]});
+        if (self.attrs.first) |fst| {
+            try w.print("\n", .{});
+            newindent += 2;
+            var node: ?*List.Node = fst;
+            while (node) |n| {
+                defer node = n.next;
+                const attr: *Attribute = @fieldParentPtr("node", n);
+                try attr.fmt(w, newindent, buf);
+                try w.print(",\n", .{});
+            }
+            newindent -= 2;
+            try w.print("{s} }},\n", .{buf[0..newindent]});
+        } else try w.print("}},\n", .{});
+
+        try w.print("{s}.values = &.{{", .{buf[0..newindent]});
+        if (self.values.first) |fst| {
+            try w.print("\n", .{});
+            newindent += 2;
+            var node: ?*List.Node = fst;
+            while (node) |n| {
+                defer node = n.next;
+                const val: *Element = @fieldParentPtr("node", n);
+                try val.fmt(w, newindent, buf);
+                try w.print(",\n", .{});
+            }
+            newindent -= 2;
+            try w.print("{s} }},\n", .{buf[0..newindent]});
+        } else try w.print("}},\n", .{});
+
+        newindent -= 2;
+        try w.print("{s}}}", .{buf[0..newindent]});
     }
 };
 
