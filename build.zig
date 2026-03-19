@@ -9,42 +9,72 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
     const mod = b.addModule("raytracer", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+
     const exe = b.addExecutable(.{
         .name = "raytracer",
         .root_module = mod,
+        .use_llvm = true,
     });
 
     b.installArtifact(exe);
 
+    // Setup zig build run that runs the main module executable.
+    const run = b.addRunArtifact(exe);
+    run.step.dependOn(b.getInstallStep());
     const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run.step);
 
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
-
-    run_cmd.step.dependOn(b.getInstallStep());
-
+    // Pass args addd after `zig build run --` to the executable.
     if (b.args) |args| {
-        run_cmd.addArgs(args);
+        run.addArgs(args);
     }
 
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
-    });
-
-    const run_mod_tests = b.addRunArtifact(mod_tests);
+    // Setup zig build tests cmd that runs all tests in the root_module.
+    const tests = b.addTest(.{ .root_module = mod });
+    const run_tests = b.addRunArtifact(tests);
 
     const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
+    test_step.dependOn(&run_tests.step);
 
+    // Setup zls for build on save.
     const exe_check = b.addExecutable(.{
-        .name = "raytracer",
+        .name = "check",
         .root_module = mod,
     });
-    const check = b.step("check", "Check if raytracer compiles");
-    check.dependOn(&exe_check.step);
+    const check_step = b.step("check", "Check if raytracer compiles");
+    check_step.dependOn(&exe_check.step);
+    check_step.dependOn(&tests.step);
+
+    inline for (libs) |lib| {
+        addLib(b, mod, test_step, check_step, lib.name, lib.path);
+    }
+}
+
+const libs = &.{
+    .{ .name = "xml", .path = "lib/xml.zig" },
+};
+
+fn addLib(
+    b: *std.Build,
+    mod: *std.Build.Module,
+    test_step: *std.Build.Step,
+    check_step: *std.Build.Step,
+    lib_name: []const u8,
+    lib_path: []const u8,
+) void {
+    const lib = b.addModule(lib_name, .{
+        .root_source_file = b.path(lib_path),
+        .target = mod.resolved_target.?,
+        .optimize = mod.optimize.?,
+    });
+    const tests = b.addTest(.{ .root_module = lib });
+    mod.addImport(lib_name, lib);
+    test_step.dependOn(&b.addRunArtifact(tests).step);
+    check_step.dependOn(&tests.step);
 }
