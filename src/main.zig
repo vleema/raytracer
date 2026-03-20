@@ -2,6 +2,7 @@ const std = @import("std");
 const ppm = @import("ppm");
 const img = @import("img.zig");
 
+// TODO: Implement png library.
 // TODO: Implement utilities for cmdline arg parsing.
 pub fn main() !void {
     const scene_file = try std.fs.cwd().openFile("scene.xml", .{});

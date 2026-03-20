@@ -1,5 +1,6 @@
 // TODO: Report errors with line numbers.
 // TODO: Possibly add proper support for text inside elements.
+// TODO: Prohibit duplicate tag attributes.
 
 const std = @import("std");
 const List = std.DoublyLinkedList;
