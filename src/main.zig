@@ -8,6 +8,7 @@ pub fn main() !void {
     defer out.close();
 
     const scene_file = try std.fs.cwd().openFile("scene.xml", .{});
+    defer scene_file.close();
     const scene = try img.Scene.fromFile(scene_file);
 
     try ppm.writeP6(&out, scene.film.x_res, scene.film.y_res, scene);
