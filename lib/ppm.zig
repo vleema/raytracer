@@ -3,6 +3,7 @@ const std = @import("std");
 /// Writes to PPM P6 file using the method `render` from a renderer to define a color of a position.
 ///
 /// The render method should have the signature `render(self, x: usize, y: usize) [3]u8`.
+/// The render function will be used as callback to compute the color of each iterated pixel.
 pub fn writeP6(
     file: *std.fs.File,
     width: usize,
