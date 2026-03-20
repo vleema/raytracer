@@ -58,6 +58,7 @@ pub fn build(b: *std.Build) void {
 
 const libs = &.{
     .{ .name = "xml", .path = "lib/xml.zig" },
+    .{ .name = "ppm", .path = "lib/ppm.zig" },
 };
 
 fn addLib(

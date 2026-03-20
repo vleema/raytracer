@@ -49,6 +49,11 @@ pub const Scene = struct {
             ),
         };
     }
+
+    pub fn render(self: *const @This(), x: usize, y: usize) [3]u8 {
+        const color = self.backgroundPixel(.{ x, y });
+        return .{ color.r, color.g, color.b };
+    }
 };
 
 pub const Film = struct {
@@ -170,7 +175,7 @@ fn bilerp(tl: Pixel, tr: Pixel, bl: Pixel, br: Pixel, pos: Point(2)) Color {
 }
 
 fn factor(x1: f64, x2: f64, x: f64) f64 {
-    return (x - x1) / (x2 - x1);
+    return std.math.clamp((x - x1) / (x2 - x1), 0, 1);
 }
 
 pub const Color = struct {

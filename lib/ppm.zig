@@ -1,0 +1,27 @@
+const std = @import("std");
+
+/// Writes to PPM P6 file using the method `render` from a renderer to define a color of a position.
+///
+/// The render method should have the signature `render(self, x: usize, y: usize) [3]u8`.
+pub fn writeP6(
+    file: *std.fs.File,
+    width: usize,
+    height: usize,
+    renderer: anytype,
+) !void {
+    var buf: [1 << 16]u8 = undefined;
+    var fw = file.writer(&buf);
+    const w = &fw.interface;
+
+    try w.print("P6\n", .{});
+    try w.print("{d} {d}\n", .{ width, height });
+    try w.print("255\n", .{});
+
+    for (0..width) |y| {
+        for (0..height) |x| {
+            try w.writeAll(&renderer.render(x, y));
+        }
+    }
+
+    try w.flush();
+}
