@@ -3,11 +3,13 @@
 const std = @import("std");
 const xml = @import("xml");
 
+/// Represents a scene that could be rendered to a image in the raytracer.
 pub const Scene = struct {
-    camera: struct {} = .{},
+    camera: Camera = .{ .perspective = .{} },
     film: Film = .{},
     world: World = .{},
 
+    /// Creates a scene from a xml file.
     pub fn fromFile(file: std.fs.File) !Scene {
         var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
         defer arena.deinit();
@@ -18,18 +20,26 @@ pub const Scene = struct {
         defer std.posix.munmap(mmap);
         const root = try xml.parse(mmap, arena_allocator);
 
+        return fromXml(&root);
+    }
+
+    /// Creates a scene from a `xml.Element`.
+    pub fn fromXml(root: *const xml.Element) !@This() {
         var scene: Scene = .{};
         var node = root.values.first;
         while (node) |n| {
+            const eql = std.mem.eql;
             const elem: *xml.Element = @fieldParentPtr("node", n);
             node = n.next;
-            if (std.mem.eql(u8, elem.key, "camera"))
-                std.log.warn("camera tag still not supported", .{})
-            else if (std.mem.eql(u8, elem.key, "film"))
-                scene.film = try @TypeOf(scene.film).fromXml(elem)
-            else if (std.mem.eql(u8, elem.key, "world_begin"))
-                scene.world, node = try @TypeOf(scene.world).fromXml(elem)
-            else {
+
+            // TODO: improve option parsing.
+            if (eql(u8, elem.key, "camera")) {
+                scene.camera = try @TypeOf(scene.camera).fromXml(elem);
+            } else if (eql(u8, elem.key, "film")) {
+                scene.film = try @TypeOf(scene.film).fromXml(elem);
+            } else if (eql(u8, elem.key, "world_begin")) {
+                scene.world, node = try @TypeOf(scene.world).fromXml(elem);
+            } else {
                 std.log.err("unrecognized option {s}", .{elem.key});
                 return error.UnrecognizedOption;
             }
@@ -51,13 +61,44 @@ pub const Scene = struct {
         };
     }
 
+    /// Returns the array form of color of a given pixel in a image file.
     pub fn render(self: *const @This(), x: usize, y: usize) [3]u8 {
         const color = self.backgroundPixelColor(.{ x, y });
         return .{ color.r, color.g, color.b };
     }
 };
 
-pub const Film = struct {
+const Camera = union(enum) {
+    // TODO: add frame aspect ratio.
+    orthographic: struct {
+        left: f64 = -5.3,
+        right: f64 = 5.3,
+        bottom: f64 = -4,
+        top: f64 = 4,
+    },
+    perspective: struct {
+        fovy: usize = 30,
+    },
+
+    fn fromXml(elem: *const xml.Element) !@This() {
+        if (elem.queryAttribute("type", "orthographic")) |_| {
+            var cam: @This() = .{ .orthographic = .{} };
+            const sw_val = elem.queryAttribute("screen_window", null) orelse return cam;
+            const sw = try xml.parseFloatArray(f64, 4, sw_val);
+            cam.orthographic = .{ .left = sw[0], .right = sw[1], .bottom = sw[2], .top = sw[3] };
+            return cam;
+        }
+        if (elem.queryAttribute("type", "perspective")) |_| {
+            var cam: @This() = .{ .perspective = .{} };
+            const fovy = elem.queryAttribute("fovy", null) orelse return cam;
+            cam.perspective.fovy = try std.fmt.parseUnsigned(usize, fovy, 10);
+            return cam;
+        }
+        return error.InvalidCameraType;
+    }
+};
+
+const Film = struct {
     typ: enum { image } = .image,
     width: usize = 400,
     height: usize = 200,
