@@ -14,7 +14,7 @@ pub const Scene = struct {
     world: World = .{},
 
     /// Creates a scene from a xml file.
-    pub fn fromFile(file: std.fs.File) !Scene {
+    pub fn fromXmlFile(file: std.fs.File) !Scene {
         var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
         defer arena.deinit();
         const arena_allocator = arena.allocator();
@@ -28,7 +28,7 @@ pub const Scene = struct {
     }
 
     /// Writes the scene into a file under `dir`.
-    pub fn intoImg(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
+    pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
         var out = try dir.createFile(self.film.filename, .{});
         defer out.close();
 
