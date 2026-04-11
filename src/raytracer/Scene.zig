@@ -49,28 +49,17 @@ pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs
 /// Creates a scene from a `xml.Element`.
 pub fn fromXml(root: *const xml.Element) !@This() {
     var scene = @This(){};
-    var node = root.values.first;
     const options = .{
-        .{ .key = "camera", .val = &scene.camera },
-        .{ .key = "lookat", .val = &scene.look },
-        .{ .key = "integrator", .val = &scene.integrator },
-        .{ .key = "film", .val = &scene.film },
-        .{ .key = "world", .val = &scene.world },
+        .camera = &scene.camera,
+        .lookat = &scene.look,
+        .integrator = &scene.integrator,
+        .film = &scene.film,
+        .world = &scene.world,
     };
-    while (node) |n| {
-        const eql = std.mem.eql;
-        const elem: *xml.Element = @fieldParentPtr("node", n);
-        node = n.next;
-
-        inline for (options) |o| {
-            if (eql(u8, o.key, elem.key)) {
-                o.val.* = try .fromXml(elem);
-                break;
-            }
-        } else {
-            log.err("unrecognized option {s}", .{elem.key});
-            return error.UnrecognizedOption;
-        }
+    if (try xml.parseChildren(options, root)) |unknown| {
+        const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
+        log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
+        return error.UnrecognizedOption;
     }
     return scene;
 }
