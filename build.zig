@@ -51,31 +51,35 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&exe_check.step);
     check_step.dependOn(&tests.step);
 
+    const libs = &.{
+        .{ .name = "xml", .path = "lib/xml.zig", .link_libc = false, .deps = .{ .system = &.{} } },
+        .{ .name = "ppm", .path = "lib/ppm.zig", .link_libc = false, .deps = .{ .system = &.{} } },
+        .{ .name = "png", .path = "lib/png.zig", .link_libc = true, .deps = .{ .system = &.{"z"} } },
+    };
+
     inline for (libs) |lib| {
-        addLib(b, mod, test_step, check_step, lib.name, lib.path);
+        addLib(b, mod, test_step, check_step, lib);
     }
 }
-
-const libs = &.{
-    .{ .name = "xml", .path = "lib/xml.zig" },
-    .{ .name = "ppm", .path = "lib/ppm.zig" },
-};
 
 fn addLib(
     b: *std.Build,
     mod: *std.Build.Module,
     test_step: *std.Build.Step,
     check_step: *std.Build.Step,
-    lib_name: []const u8,
-    lib_path: []const u8,
+    opts: anytype,
 ) void {
-    const lib = b.addModule(lib_name, .{
-        .root_source_file = b.path(lib_path),
+    const lib = b.addModule(opts.name, .{
+        .root_source_file = b.path(opts.path),
         .target = mod.resolved_target.?,
         .optimize = mod.optimize.?,
     });
     const tests = b.addTest(.{ .root_module = lib });
-    mod.addImport(lib_name, lib);
+    inline for (opts.deps.system) |dep| {
+        lib.linkSystemLibrary(dep, .{});
+    }
+    if (opts.link_libc) lib.link_libc = true;
+    mod.addImport(opts.name, lib);
     test_step.dependOn(&b.addRunArtifact(tests).step);
     check_step.dependOn(&tests.step);
 }
