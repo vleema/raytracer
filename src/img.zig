@@ -192,12 +192,8 @@ const Color = struct {
     // TODO: Add support for hexadecimal values.
     fn fromStr(str: ?[]const u8) !@This() {
         if (str == null or str.?.len == 0) return .{};
-        var it = std.mem.splitScalar(u8, str.?, ' ');
-        return .{
-            .r = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedRedColor, 10),
-            .g = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedGreenColor, 10),
-            .b = try std.fmt.parseUnsigned(u8, it.next() orelse return error.ExpectedBlueColor, 10),
-        };
+        const arr = try xml.parseUnsignedArray(u8, 3, str.?);
+        return .{ .r = arr[0], .g = arr[1], .b = arr[2] };
     }
 
     fn interpolate(x: u8, y: u8, f: f64) u8 {
