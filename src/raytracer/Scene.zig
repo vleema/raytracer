@@ -22,15 +22,13 @@ film: Film = .{},
 world: World = .{},
 
 /// Creates a scene from a xml file.
-pub fn fromXmlFile(file: std.fs.File) !Scene {
-    var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
-    defer arena.deinit();
-    const arena_allocator = arena.allocator();
-
+pub fn fromXmlFile(allocator: std.mem.Allocator, file: std.fs.File) !Scene {
     const md = try file.stat();
     const mmap = try std.posix.mmap(null, md.size, std.posix.PROT.READ, .{ .TYPE = .PRIVATE }, file.handle, 0);
     defer std.posix.munmap(mmap);
-    const root = try xml.parse(mmap, arena_allocator);
+
+    var root = try xml.parse(mmap, allocator);
+    defer root.deinit(allocator);
 
     return fromXml(&root);
 }
