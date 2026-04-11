@@ -62,7 +62,7 @@ pub const Film = struct {
     width: usize = 400,
     height: usize = 200,
     filename: []const u8 = "out.ppm",
-    img_type: enum { ppm } = .ppm,
+    img_type: enum { ppm, png } = .ppm,
 
     const film_log = std.log.scoped(.film);
     var filename_buf: [256]u8 = undefined;
@@ -89,10 +89,13 @@ pub const Film = struct {
         }
 
         if (elem.queryAttribute("img_type", null)) |typ| {
-            if (std.mem.eql(u8, "ppm", typ))
-                film.img_type = .ppm
-            else
+            if (std.mem.eql(u8, "ppm", typ)) {
+                film.img_type = .ppm;
+            } else if (std.mem.eql(u8, "png", typ)) {
+                film.img_type = .png;
+            } else {
                 return error.InvalidImgType;
+            }
         }
 
         return film;
