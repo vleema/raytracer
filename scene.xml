@@ -3,7 +3,7 @@
     <camera type="orthographic" screen_window="-5.3 5.3 -4 4"/>
     <integrator type="flat" />
     <film type="image" w_res="200" h_res="100" filename="simple_bkg.png" img_type="png" />
-    <world_begin/>
-        <background type="single_color" color="153 204 255"/>
-    <world_end/>
+    <world>
+        <background type="4_colors" bl="0 0 51" tl="0 255 51" tr="255 255 51" br="255 0 51" />
+    </world>
 </RT3>
