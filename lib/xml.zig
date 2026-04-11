@@ -198,6 +198,41 @@ pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
     return elem;
 }
 
+/// Iterates `elem`'s children and dispatches each to the matching field in `options`.
+/// Field names of `options` are the XML element keys; field values are pointers to targets.
+/// Each target type must implement `fromXml(*const xml.Element) !T`.
+/// Returns the key of the first unrecognized child, or null on success.
+pub fn parseChildren(options: anytype, elem: *const Element) !?[]const u8 {
+    const fields = @typeInfo(@TypeOf(options)).@"struct".fields;
+    var node = elem.values.first;
+    while (node) |n| {
+        const child: *const Element = @fieldParentPtr("node", n);
+        node = n.next;
+        var matched = false;
+
+        inline for (fields) |f| {
+            if (!matched and std.mem.eql(u8, f.name, child.key)) {
+                const ptr = @field(options, f.name);
+                ptr.* = try .fromXml(child);
+                matched = true;
+            }
+        }
+        if (!matched) return child.key;
+    }
+    return null;
+}
+
+/// Comptime utility: builds "['a', 'b', 'c']" from the field names of type `T`.
+pub fn fieldKeysStr(T: type) []const u8 {
+    const fields = @typeInfo(T).@"struct".fields;
+    var result: []const u8 = "[";
+    for (fields, 0..) |f, i| {
+        result = result ++ "'" ++ f.name ++ "'";
+        if (i < fields.len - 1) result = result ++ ", ";
+    }
+    return result ++ "]";
+}
+
 /// Parses a UTF-8 encoded string of floating point numbers into an arbitrary size array.
 ///
 /// For example, "1.2 2.5 3.1415 -4.7" is parsed as `.{1.2, 2.5, 3.1415, -4.7}`.
