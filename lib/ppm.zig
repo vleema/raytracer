@@ -6,8 +6,8 @@ const std = @import("std");
 /// The render function will be used as callback to compute the color of each iterated pixel.
 pub fn writeP6(
     file: *std.fs.File,
-    width: usize,
-    height: usize,
+    width: u32,
+    height: u32,
     renderer: anytype,
 ) !void {
     var buf: [1 << 16]u8 = undefined;
@@ -18,9 +18,10 @@ pub fn writeP6(
     try w.print("{d} {d}\n", .{ width, height });
     try w.print("255\n", .{});
 
-    for (0..width) |y| {
-        for (0..height) |x| {
-            try w.writeAll(&renderer.render(x, y));
+    for (0..height) |y| {
+        for (0..width) |x| {
+            const color: [3]u8 = renderer.render(@intCast(x), @intCast(y));
+            try w.writeAll(&color);
         }
     }
 

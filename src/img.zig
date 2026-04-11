@@ -1,6 +1,8 @@
 // TODO: Document this properly.
 
 const std = @import("std");
+const png = @import("png");
+const ppm = @import("ppm");
 const xml = @import("xml");
 
 /// Represents a scene that could be rendered to a image in the raytracer.
@@ -23,6 +25,17 @@ pub const Scene = struct {
         const root = try xml.parse(mmap, arena_allocator);
 
         return fromXml(&root);
+    }
+
+    /// Writes the scene into a file under `dir`.
+    pub fn intoImg(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
+        var out = try dir.createFile(self.film.filename, .{});
+        defer out.close();
+
+        switch (self.film.img_type) {
+            .png => try png.writeTrueColor8(allocator, &out, self.film.width, self.film.height, self),
+            .ppm => try ppm.writeP6(&out, self.film.width, self.film.height, self),
+        }
     }
 
     /// Creates a scene from a `xml.Element`.
@@ -68,7 +81,7 @@ pub const Scene = struct {
     }
 
     /// Returns the array form of color of a given pixel in a image file.
-    pub fn render(self: *const @This(), x: usize, y: usize) [3]u8 {
+    pub fn render(self: *const @This(), x: u32, y: u32) [3]u8 {
         const color = self.backgroundPixelColor(.{ x, y });
         return .{ color.r, color.g, color.b };
     }
@@ -144,8 +157,8 @@ const Integrator = union(enum) {
 
 const Film = struct {
     typ: enum { image } = .image,
-    width: usize = 400,
-    height: usize = 200,
+    width: u32 = 400,
+    height: u32 = 200,
     filename: []const u8 = "out.ppm",
     img_type: enum { ppm, png } = .ppm,
 
@@ -163,10 +176,10 @@ const Film = struct {
         }
 
         if (elem.queryAttribute("width", null)) |x|
-            film.width = try std.fmt.parseUnsigned(usize, x, 10);
+            film.width = try std.fmt.parseUnsigned(u32, x, 10);
 
         if (elem.queryAttribute("height", null)) |y|
-            film.height = try std.fmt.parseUnsigned(usize, y, 10);
+            film.height = try std.fmt.parseUnsigned(u32, y, 10);
 
         if (elem.queryAttribute("filename", null)) |n| {
             std.mem.copyForwards(u8, &filename_buf, n);
@@ -278,7 +291,7 @@ const Color = struct {
     g: u8 = 0,
     b: u8 = 0,
 
-    // TODO: Add support for hexadecimal values.
+    // TODO: Possibly add support for hexadecimal values.
     fn fromStr(str: ?[]const u8) !@This() {
         if (str == null or str.?.len == 0) return .{};
         const arr = try xml.parseUnsignedArray(u8, 3, str.?);
@@ -304,7 +317,7 @@ const Color = struct {
 
 /// Represents a element of a vector space of unsigned points.
 pub fn UnsignedPoint(N: comptime_int) type {
-    return @Vector(N, usize);
+    return @Vector(N, u32);
 }
 
 /// Represents a element of a vector space of signed points.

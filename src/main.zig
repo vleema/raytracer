@@ -1,5 +1,6 @@
 const std = @import("std");
 const ppm = @import("ppm");
+const png = @import("png");
 const img = @import("img.zig");
 
 // TODO: Implement png library.
@@ -8,11 +9,7 @@ pub fn main() !void {
     const scene_file = try std.fs.cwd().openFile("scene.xml", .{});
     defer scene_file.close();
     const scene = try img.Scene.fromFile(scene_file);
-
-    var out = try std.fs.cwd().createFile("out.ppm", .{});
-    defer out.close();
-
-    try ppm.writeP6(&out, scene.film.width, scene.film.height, scene);
+    try scene.intoImg(std.heap.smp_allocator, std.fs.cwd());
 }
 
 test {
