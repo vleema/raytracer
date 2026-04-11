@@ -46,6 +46,26 @@ pub fn dot(
     return @reduce(.Add, u * v);
 }
 
+/// Computes a direction vector from a spherical coordinate.
+pub fn sphericalDirection(sin_theta: f64, cos_theta: f64, phi: f64) Real(3) {
+    return .{
+        math.clamp(sin_theta, -1, 1) * @cos(phi),
+        math.clamp(sin_theta, -1, 1) * @sin(phi),
+        math.clamp(cos_theta, -1, 1),
+    };
+}
+
+/// Returns the spherical theta from a vector.
+pub fn sphericalTheta(w: Real(3)) f64 {
+    return math.acos(math.clamp(w[2], -1, 1));
+}
+
+/// Returns the spherical phi from a vector.
+pub fn sphericalPhi(w: Real(3)) f64 {
+    const phi = math.atan2(w[1], w[0]);
+    return if (phi < 0) phi + 2 * math.pi else phi;
+}
+
 const testing = std.testing;
 
 test "dot: perpendicular vectors" {
@@ -106,4 +126,45 @@ test "normalize: zero vector returns zero vector" {
     const v = @Vector(3, f32){ 0, 0, 0 };
     const result = normalize(3, f32, v);
     try testing.expectEqual(@Vector(3, f32){ 0, 0, 0 }, result);
+}
+
+test "sphericalDirection: north pole" {
+    const d = sphericalDirection(0, 1, 0);
+    try testing.expectEqual(@as(Real(3), .{ 0, 0, 1 }), d);
+}
+
+test "sphericalDirection: equator at phi=0 points along +x" {
+    const d = sphericalDirection(1, 0, 0);
+    try testing.expectEqual(@as(Real(3), .{ 1, 0, 0 }), d);
+}
+
+test "sphericalDirection: equator at phi=pi/2 points along +y" {
+    const d = sphericalDirection(1, 0, math.pi / 2.0);
+    try testing.expectApproxEqAbs(@as(f64, 0), d[0], 1e-9);
+    try testing.expectApproxEqAbs(@as(f64, 1), d[1], 1e-9);
+    try testing.expectApproxEqAbs(@as(f64, 0), d[2], 1e-9);
+}
+
+test "sphericalTheta: north pole returns 0" {
+    try testing.expectEqual(@as(f64, 0), sphericalTheta(.{ 0, 0, 1 }));
+}
+
+test "sphericalTheta: equator returns pi/2" {
+    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalTheta(.{ 1, 0, 0 }), 1e-9);
+}
+
+test "sphericalTheta: south pole returns pi" {
+    try testing.expectApproxEqAbs(math.pi, sphericalTheta(.{ 0, 0, -1 }), 1e-9);
+}
+
+test "sphericalPhi: positive x axis returns 0" {
+    try testing.expectApproxEqAbs(@as(f64, 0), sphericalPhi(.{ 1, 0, 0 }), 1e-9);
+}
+
+test "sphericalPhi: positive y axis returns pi/2" {
+    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalPhi(.{ 0, 1, 0 }), 1e-9);
+}
+
+test "sphericalPhi: negative y axis wraps to 3*pi/2" {
+    try testing.expectApproxEqAbs(3.0 * math.pi / 2.0, sphericalPhi(.{ 0, -1, 0 }), 1e-9);
 }
