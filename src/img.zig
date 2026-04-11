@@ -98,7 +98,7 @@ pub const Film = struct {
     }
 };
 
-pub const World = struct {
+const World = struct {
     background: Background = .{ .single_color = .{} },
 
     const world_log = std.log.scoped(.world);
@@ -124,7 +124,7 @@ pub const World = struct {
     }
 };
 
-pub const Background = union(enum) {
+const Background = union(enum) {
     single_color: struct {
         color: Color = .{},
     },
@@ -161,12 +161,18 @@ pub const Background = union(enum) {
     }
 };
 
-pub const Pixel = struct {
-    pos: Point(2),
+const Pixel = struct {
+    pos: UnsignedPoint(2),
     color: Color,
 };
 
-fn bilerp(tl: Pixel, tr: Pixel, bl: Pixel, br: Pixel, pos: Point(2)) Color {
+fn bilerp(
+    tl: Pixel,
+    tr: Pixel,
+    bl: Pixel,
+    br: Pixel,
+    pos: UnsignedPoint(2),
+) Color {
     const horizontal_factor = factor(@floatFromInt(tl.pos[0]), @floatFromInt(tr.pos[0]), @floatFromInt(pos[0]));
     const vertical_factor = factor(@floatFromInt(tl.pos[1]), @floatFromInt(bl.pos[1]), @floatFromInt(pos[1]));
     const top = tl.color.lerp(tr.color, horizontal_factor);
@@ -178,7 +184,7 @@ fn factor(x1: f64, x2: f64, x: f64) f64 {
     return std.math.clamp((x - x1) / (x2 - x1), 0, 1);
 }
 
-pub const Color = struct {
+const Color = struct {
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
