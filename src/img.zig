@@ -7,6 +7,7 @@ const xml = @import("xml");
 pub const Scene = struct {
     camera: Camera = .{ .perspective = .{} },
     lookat: LookAt = .{},
+    integrator: Integrator = .flat,
     film: Film = .{},
     world: World = .{},
 
@@ -38,6 +39,8 @@ pub const Scene = struct {
                 scene.camera = try @TypeOf(scene.camera).fromXml(elem);
             } else if (eql(u8, elem.key, "lookat")) {
                 scene.lookat = try @TypeOf(scene.lookat).fromXml(elem);
+            } else if (eql(u8, elem.key, "integrator")) {
+                scene.integrator = try @TypeOf(scene.integrator).fromXml(elem);
             } else if (eql(u8, elem.key, "film")) {
                 scene.film = try @TypeOf(scene.film).fromXml(elem);
             } else if (eql(u8, elem.key, "world_begin")) {
@@ -125,6 +128,17 @@ const LookAt = struct {
         }
 
         return ret;
+    }
+};
+
+const Integrator = union(enum) {
+    flat,
+
+    fn fromXml(elem: *const xml.Element) !@This() {
+        if (elem.queryAttribute("type", "flat")) |_| {
+            return .flat;
+        }
+        return error.InvalidIntegratorType;
     }
 };
 
