@@ -26,7 +26,6 @@
       mainProgram = "raytracer-zig";
       license = lib.licenses.bsd3;
     };
-
     src = builtins.path {
       name = pname;
       path = ./.;
@@ -39,6 +38,7 @@
     flake-utils.lib.eachSystem supportedSystems (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
+        buildInputs = [pkgs.zlib];
       in {
         # nix develop
         devshells = {
@@ -55,7 +55,7 @@
         # nix build
         packages = {
           default = pkgs.stdenv.mkDerivation {
-            inherit version src meta;
+            inherit version src meta buildInputs;
             name = pname;
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
@@ -67,7 +67,7 @@
         # nix flake check
         checks = {
           tests = pkgs.stdenv.mkDerivation {
-            inherit version src;
+            inherit version src buildInputs;
             pname = "${pname}-tests";
             nativeBuildInputs = [pkgs.zig];
             buildPhase = ''
@@ -76,7 +76,7 @@
             '';
           };
           lint = pkgs.stdenv.mkDerivation {
-            inherit version src;
+            inherit version src buildInputs;
             pname = "${pname}-lint";
             nativeBuildInputs = with pkgs; [zig zig-zlint];
             buildPhase = ''zlint'';
