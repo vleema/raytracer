@@ -15,11 +15,13 @@ const World = @import("World.zig");
 
 const Scene = @This();
 
-camera: Camera = .{ .perspective = .{} },
+camera: Camera = .{ .rectangular = .{ .perspective = .{} } },
 look: Look = .{},
 integrator: Integrator = .flat,
 film: Film = .{},
 world: World = .{},
+
+const log = std.log.scoped(.scene);
 
 /// Creates a scene from a xml file.
 pub fn fromXmlFile(allocator: std.mem.Allocator, file: std.fs.File) !Scene {
@@ -65,7 +67,7 @@ pub fn fromXml(root: *const xml.Element) !@This() {
         } else if (eql(u8, elem.key, "world")) {
             scene.world = try .fromXml(elem);
         } else {
-            std.log.err("unrecognized option {s}", .{elem.key});
+            log.err("unrecognized option {s}", .{elem.key});
             return error.UnrecognizedOption;
         }
     }
@@ -79,7 +81,7 @@ pub fn render(self: *const @This(), x: u32, y: u32) [3]u8 {
         self.film.height,
         .{ @floatFromInt(x), @floatFromInt(y) },
     );
-    std.debug.print("ray: {}\n", .{self.camera.generateRay(x, y, self.look.frame(), self.film)});
+    std.debug.print("ray: {}\n", .{self.camera.generateRay(x, y, self.look.normalFrame(), self.film)});
     return .{ color.r, color.g, color.b };
 }
 
@@ -97,11 +99,13 @@ test "from xml" {
     ;
     const expected = Scene{
         .camera = .{
-            .orthographic = .{
-                .left = -5.3,
-                .right = 5.3,
-                .bottom = -4,
-                .top = 4,
+            .rectangular = .{
+                .orthographic = .{
+                    .left = -5.3,
+                    .right = 5.3,
+                    .bottom = -4,
+                    .top = 4,
+                },
             },
         },
         .look = .{

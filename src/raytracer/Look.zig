@@ -13,7 +13,7 @@ pub const Frame = struct {
     direction: @Vector(3, f64),
 };
 
-pub fn frame(self: @This()) Frame {
+pub fn normalFrame(self: @This()) Frame {
     const gaze = self.at - self.from;
     const direction = vec.normalize(3, f64, gaze);
     const right = vec.normalize(3, f64, vec.cross3(f64, self.up, direction));

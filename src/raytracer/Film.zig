@@ -7,7 +7,7 @@ height: u32 = 200,
 filename: []const u8 = "out.ppm",
 img_type: enum { ppm, png } = .ppm,
 
-const film_log = std.log.scoped(.film);
+const log = std.log.scoped(.film);
 var filename_buf: [256]u8 = undefined;
 
 pub fn fromXml(elem: *const xml.Element) !@This() {
@@ -37,6 +37,7 @@ pub fn fromXml(elem: *const xml.Element) !@This() {
         } else if (std.mem.eql(u8, "png", typ)) {
             film.img_type = .png;
         } else {
+            log.err("expected one of ['ppm', 'png'], found {s}", .{typ});
             return error.InvalidImgType;
         }
     }

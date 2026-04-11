@@ -1,6 +1,7 @@
 <RT3>
     <lookat look_from="0 0 -7" look_at="0 0 0" up="0 1 0" />
     <camera type="orthographic" screen_window="-5.3 5.3 -4 4"/>
+    <!-- <camera type="spherical" variant="equirectangular"/> -->
     <integrator type="flat" />
     <film type="image" w_res="200" h_res="100" filename="simple_bkg.png" img_type="png" />
     <world>
