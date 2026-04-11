@@ -182,6 +182,7 @@ pub const ParseError = error{
     ExpectedClosingTag,
     ExpectedTagEnd,
     InvalidClosingTag,
+    UnexpectedEndOfArray,
 };
 
 /// Parses a UTF-8 encoded string into a Xml Document.
@@ -195,6 +196,70 @@ pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
     const elem = (try parseElement(&lexer, allocator)) orelse unreachable;
 
     return elem;
+}
+
+/// Parses a UTF-8 encoded string of floating point numbers into an arbitrary size array.
+///
+/// For example, "1.2 2.5 3.1415 -4.7" is parsed as `.{1.2, 2.5, 3.1415, -4.7}`.
+pub fn parseFloatArray(T: type, N: comptime_int, val: []const u8) ![N]T {
+    const cb = struct {
+        fn cb(v: []const u8) !T {
+            return std.fmt.parseFloat(T, v);
+        }
+    }.cb;
+    return parseArray(T, N, cb, val);
+}
+
+/// Parses a UTF-8 encoded string of unsigned integers into a arbitrary size array.
+///
+/// For example, "1 2 3 4" is parsed as `.{1, 2, 3, 4}`.
+pub fn parseUnsignedArray(T: type, N: comptime_int, val: []const u8) ![N]T {
+    const cb = struct {
+        fn cb(v: []const u8) !T {
+            return std.fmt.parseUnsigned(T, v, 10);
+        }
+    }.cb;
+    return parseArray(T, N, cb, val);
+}
+
+/// Parses a UTF-8 encoded string of signed integers into a arbitrary size array.
+///
+/// For example, "1 -2 3 4" is parsed as `.{1, -2, 3, 4}`.
+pub fn parseSignedArray(T: type, N: comptime_int, val: []const u8) ![N]T {
+    const cb = struct {
+        fn cb(v: []const u8) !T {
+            return std.fmt.parseInt(T, v, 10);
+        }
+    }.cb;
+    return parseArray(T, N, cb, val);
+}
+
+/// Parses a UTF-8 encoded string array of any type using the `cb` function to parse each element.
+///
+/// For example, suppose that `cb` is a function that parses a string into a integer, and `val`
+/// is "1 2 3 4". The result of `parseArray` will be the application of `cb` into every element
+/// of the string separated by one or more spaces:
+///
+/// ```zig
+/// const val = "1 2   3    4";
+/// parseArray(i32, 3, cb, val) == .{cb(1), cb(2), cb(3), cb(4)}
+///                             == .{1, 2, 3, 4}
+/// ```
+pub fn parseArray(
+    T: type,
+    N: comptime_int,
+    cb: fn ([]const u8) anyerror!T,
+    val: []const u8,
+) ![N]T {
+    var ret: [N]T = @splat(undefined);
+    var it = std.mem.splitScalar(u8, val, ' ');
+    inline for (&ret) |*r| {
+        const next = while (it.next()) |n| {
+            if (n.len > 0) break n;
+        } else return ParseError.UnexpectedEndOfArray;
+        r.* = try cb(next);
+    }
+    return ret;
 }
 
 fn parseElement(lexer: *Lexer, allocator: std.mem.Allocator) !?Element {
@@ -461,6 +526,16 @@ test "lexer test" {
         try std.testing.expect(tok != null);
         try std.testing.expectEqualDeep(tok.?, tt);
     }
+}
+
+test "parse array value" {
+    const in = "1 2     3";
+    const parseFn = struct {
+        fn call(val: []const u8) !u8 {
+            return std.fmt.parseUnsigned(u8, val, 10);
+        }
+    }.call;
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, &try parseArray(u8, 3, parseFn, in));
 }
 
 test "parser test" {
