@@ -21,7 +21,13 @@ pub const Camera = union(enum) {
         top: f64 = 4,
     };
 
-    pub fn generateRay(self: *const @This(), img_x: u32, img_y: u32, frame: Frame, film: Film) Ray {
+    pub fn generateRay(
+        self: *const @This(),
+        img_x: u32,
+        img_y: u32,
+        frame: Frame,
+        film: Film,
+    ) Ray {
         const w: f64 = @floatFromInt(film.width);
         const h: f64 = @floatFromInt(film.height);
         const ix: f64 = @floatFromInt(img_x);
@@ -30,7 +36,7 @@ pub const Camera = union(enum) {
         const aspect_ratio = w / h;
         const sw = self.screenWindow(aspect_ratio);
         const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * ix / w);
-        const sw_y: Real(3) = @splat(sw.left + (sw.right - sw.left) * iy / w);
+        const sw_y: Real(3) = @splat(sw.bottom + (sw.top - sw.bottom) * iy / h);
 
         return switch (self.*) {
             .orthographic => |_| Ray{
@@ -76,3 +82,47 @@ pub const Camera = union(enum) {
         return error.InvalidCameraType;
     }
 };
+
+const testing = std.testing;
+
+const axis_frame = Frame{
+    .origin = .{ 0, 0, 0 },
+    .direction = .{ 0, 0, 1 },
+    .right = .{ 1, 0, 0 },
+    .orientation = .{ 0, 1, 0 },
+};
+
+test "orthographic: top-left pixel maps to screen window corner" {
+    const cam: Camera = .{ .orthographic = .{ .left = -2, .right = 2, .bottom = -2, .top = 2 } };
+    const film = Film{ .width = 4, .height = 4 };
+    const ray = cam.generateRay(0, 0, axis_frame, film);
+    try testing.expectEqual(Ray{ .origin = .{ -2, -2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
+}
+
+test "orthographic: center pixel maps to screen window center" {
+    const cam: Camera = .{ .orthographic = .{ .left = -2, .right = 2, .bottom = -2, .top = 2 } };
+    const film = Film{ .width = 4, .height = 4 };
+    const ray = cam.generateRay(2, 2, axis_frame, film);
+    try testing.expectEqual(Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } }, ray);
+}
+
+test "orthographic: direction is always frame direction" {
+    const cam: Camera = .{ .orthographic = .{} };
+    const film = Film{ .width = 4, .height = 4 };
+    const ray = cam.generateRay(3, 1, axis_frame, film);
+    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
+}
+
+test "perspective: origin is always frame origin" {
+    const cam: Camera = .{ .perspective = .{} };
+    const film = Film{ .width = 4, .height = 4 };
+    const ray = cam.generateRay(1, 3, axis_frame, film);
+    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ray.origin);
+}
+
+test "perspective: center pixel direction equals frame direction" {
+    const cam: Camera = .{ .perspective = .{} };
+    const film = Film{ .width = 4, .height = 4 };
+    const ray = cam.generateRay(2, 2, axis_frame, film);
+    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
+}
