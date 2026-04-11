@@ -52,6 +52,7 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&tests.step);
 
     const libs = &.{
+        .{ .name = "vec", .path = "lib/vec.zig", .link_libc = false, .deps = .{ .system = &.{} } },
         .{ .name = "xml", .path = "lib/xml.zig", .link_libc = false, .deps = .{ .system = &.{} } },
         .{ .name = "ppm", .path = "lib/ppm.zig", .link_libc = false, .deps = .{ .system = &.{} } },
         .{ .name = "png", .path = "lib/png.zig", .link_libc = true, .deps = .{ .system = &.{"z"} } },
