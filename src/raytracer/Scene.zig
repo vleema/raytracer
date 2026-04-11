@@ -50,22 +50,23 @@ pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs
 pub fn fromXml(root: *const xml.Element) !@This() {
     var scene = @This(){};
     var node = root.values.first;
+    const options = .{
+        .{ .key = "camera", .val = &scene.camera },
+        .{ .key = "lookat", .val = &scene.look },
+        .{ .key = "integrator", .val = &scene.integrator },
+        .{ .key = "film", .val = &scene.film },
+        .{ .key = "world", .val = &scene.world },
+    };
     while (node) |n| {
         const eql = std.mem.eql;
         const elem: *xml.Element = @fieldParentPtr("node", n);
         node = n.next;
 
-        // TODO: improve option parsing.
-        if (eql(u8, elem.key, "camera")) {
-            scene.camera = try .fromXml(elem);
-        } else if (eql(u8, elem.key, "lookat")) {
-            scene.look = try .fromXml(elem);
-        } else if (eql(u8, elem.key, "integrator")) {
-            scene.integrator = try .fromXml(elem);
-        } else if (eql(u8, elem.key, "film")) {
-            scene.film = try .fromXml(elem);
-        } else if (eql(u8, elem.key, "world")) {
-            scene.world = try .fromXml(elem);
+        inline for (options) |o| {
+            if (eql(u8, o.key, elem.key)) {
+                o.val.* = try .fromXml(elem);
+                break;
+            }
         } else {
             log.err("unrecognized option {s}", .{elem.key});
             return error.UnrecognizedOption;
