@@ -37,29 +37,30 @@ pub const Scene = struct {
         return scene;
     }
 
-    pub fn backgroundPixel(self: *const @This(), pt: Point(2)) Color {
+    /// Returns the color of a background pixel using bilinear interpolation.
+    pub fn backgroundPixelColor(self: *const @This(), pt: UnsignedPoint(2)) Color {
         return switch (self.world.background) {
             .single_color => |b| b.color,
             .four_colors => |b| bilerp(
                 .{ .pos = .{ 0, 0 }, .color = b.tl },
-                .{ .pos = .{ self.film.x_res, 0 }, .color = b.tr },
-                .{ .pos = .{ 0, self.film.y_res }, .color = b.bl },
-                .{ .pos = .{ self.film.x_res, self.film.y_res }, .color = b.br },
+                .{ .pos = .{ self.film.width, 0 }, .color = b.tr },
+                .{ .pos = .{ 0, self.film.height }, .color = b.bl },
+                .{ .pos = .{ self.film.width, self.film.height }, .color = b.br },
                 pt,
             ),
         };
     }
 
     pub fn render(self: *const @This(), x: usize, y: usize) [3]u8 {
-        const color = self.backgroundPixel(.{ x, y });
+        const color = self.backgroundPixelColor(.{ x, y });
         return .{ color.r, color.g, color.b };
     }
 };
 
 pub const Film = struct {
     typ: enum { image } = .image,
-    x_res: usize = 400,
-    y_res: usize = 200,
+    width: usize = 400,
+    height: usize = 200,
     filename: []const u8 = "out.ppm",
     img_type: enum { ppm } = .ppm,
 
@@ -76,11 +77,11 @@ pub const Film = struct {
                 return error.InvalidFilmType;
         }
 
-        if (elem.queryAttribute("x_res", null)) |x|
-            film.x_res = try std.fmt.parseUnsigned(usize, x, 10);
+        if (elem.queryAttribute("width", null)) |x|
+            film.width = try std.fmt.parseUnsigned(usize, x, 10);
 
-        if (elem.queryAttribute("y_res", null)) |y|
-            film.y_res = try std.fmt.parseUnsigned(usize, y, 10);
+        if (elem.queryAttribute("height", null)) |y|
+            film.height = try std.fmt.parseUnsigned(usize, y, 10);
 
         if (elem.queryAttribute("filename", null)) |n| {
             std.mem.copyForwards(u8, &filename_buf, n);

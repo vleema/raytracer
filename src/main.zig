@@ -12,5 +12,9 @@ pub fn main() !void {
     var out = try std.fs.cwd().createFile("out.ppm", .{});
     defer out.close();
 
-    try ppm.writeP6(&out, scene.film.x_res, scene.film.y_res, scene);
+    try ppm.writeP6(&out, scene.film.width, scene.film.height, scene);
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
