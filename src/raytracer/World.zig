@@ -10,23 +10,23 @@ const img = @import("img.zig");
 const Color = img.Color;
 const bilerp = img.bilerp;
 
+const Material = @import("Material.zig");
+
 background: Background = .{ .single_color = .{} },
+material: Material = .{},
 
 const log = std.log.scoped(.world);
 
 pub fn fromXml(elem: *const xml.Element) !@This() {
     var world = @This(){};
-    var node = elem.values.first;
-    while (node) |n| {
-        const val: *const xml.Element = @fieldParentPtr("node", n);
-        node = n.next;
-
-        if (eql(u8, val.key, "background")) {
-            world.background = try @TypeOf(world.background).fromXml(val);
-        } else {
-            log.err("expected 'background' tag, found {s}", .{val.key});
-            return error.UnknownTag;
-        }
+    const options = .{
+        .background = &world.background,
+        .material = &world.material,
+    };
+    if (try xml.parseChildren(options, elem)) |unknown| {
+        const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
+        log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
+        return error.UnrecognizedWorldValue;
     }
     return world;
 }
