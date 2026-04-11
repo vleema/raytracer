@@ -6,6 +6,7 @@ const xml = @import("xml");
 /// Represents a scene that could be rendered to a image in the raytracer.
 pub const Scene = struct {
     camera: Camera = .{ .perspective = .{} },
+    lookat: LookAt = .{},
     film: Film = .{},
     world: World = .{},
 
@@ -35,6 +36,8 @@ pub const Scene = struct {
             // TODO: improve option parsing.
             if (eql(u8, elem.key, "camera")) {
                 scene.camera = try @TypeOf(scene.camera).fromXml(elem);
+            } else if (eql(u8, elem.key, "lookat")) {
+                scene.lookat = try @TypeOf(scene.lookat).fromXml(elem);
             } else if (eql(u8, elem.key, "film")) {
                 scene.film = try @TypeOf(scene.film).fromXml(elem);
             } else if (eql(u8, elem.key, "world_begin")) {
@@ -95,6 +98,33 @@ const Camera = union(enum) {
             return cam;
         }
         return error.InvalidCameraType;
+    }
+};
+
+const LookAt = struct {
+    from: SignedPoint(3) = .{ 0, 0, -7 },
+    at: SignedPoint(3) = .{ 0, 0, 0 },
+    up: SignedPoint(3) = .{ 0, 1, 0 },
+
+    fn fromXml(elem: *const xml.Element) !@This() {
+        var ret = @This(){};
+        const parseSigned = struct {
+            fn call(val: []const u8) anyerror!isize {
+                return std.fmt.parseInt(isize, val, 10);
+            }
+        }.call;
+
+        if (elem.queryAttribute("look_from", null)) |v| {
+            ret.from = try xml.parseArray(isize, 3, parseSigned, v);
+        }
+        if (elem.queryAttribute("look_at", null)) |v| {
+            ret.at = try xml.parseArray(isize, 3, parseSigned, v);
+        }
+        if (elem.queryAttribute("up", null)) |v| {
+            ret.up = try xml.parseArray(isize, 3, parseSigned, v);
+        }
+
+        return ret;
     }
 };
 
