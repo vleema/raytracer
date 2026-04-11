@@ -6,7 +6,10 @@ const zlib = @cImport({
 const std = @import("std");
 const Endian = std.builtin.Endian;
 
-/// Writes a PNG with color type true color and bit depth 8.
+/// Writes a true color PNG with 8 as bit depth using the method `render` from a `renderer`.
+///
+/// The `renderer` should have a method `render(self, x: u32, y: u32) [3]u8`.
+/// The `render` function will be used to compute the color of each iterated pixel.
 pub fn writeTrueColor8(
     allocator: std.mem.Allocator,
     file: *std.fs.File,
