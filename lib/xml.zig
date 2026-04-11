@@ -213,10 +213,16 @@ pub fn parseFloatArray(T: type, N: comptime_int, val: []const u8) ![N]T {
 /// Parses a UTF-8 encoded string of unsigned integers into a arbitrary size array.
 ///
 /// For example, "1 2 3 4" is parsed as `.{1, 2, 3, 4}`.
+///
+/// The string prefix is examined to detect the true base:
+///  * A prefix of "0b" implies base 2,
+///  * A prefix of "0o" implies base 8,
+///  * A prefix of "0x" implies base 16,
+///  * Otherwise base 10 is assumed.
 pub fn parseUnsignedArray(T: type, N: comptime_int, val: []const u8) ![N]T {
     const cb = struct {
         fn cb(v: []const u8) !T {
-            return std.fmt.parseUnsigned(T, v, 10);
+            return std.fmt.parseUnsigned(T, v, 0);
         }
     }.cb;
     return parseArray(T, N, cb, val);
@@ -225,10 +231,16 @@ pub fn parseUnsignedArray(T: type, N: comptime_int, val: []const u8) ![N]T {
 /// Parses a UTF-8 encoded string of signed integers into a arbitrary size array.
 ///
 /// For example, "1 -2 3 4" is parsed as `.{1, -2, 3, 4}`.
+///
+/// The string prefix is examined to detect the true base:
+///  * A prefix of "0b" implies base 2,
+///  * A prefix of "0o" implies base 8,
+///  * A prefix of "0x" implies base 16,
+///  * Otherwise base 10 is assumed.
 pub fn parseSignedArray(T: type, N: comptime_int, val: []const u8) ![N]T {
     const cb = struct {
         fn cb(v: []const u8) !T {
-            return std.fmt.parseInt(T, v, 10);
+            return std.fmt.parseInt(T, v, 0);
         }
     }.cb;
     return parseArray(T, N, cb, val);
