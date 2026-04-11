@@ -211,6 +211,12 @@ pub const Color = struct {
     }
 };
 
-pub fn Point(N: comptime_int) type {
+/// Represents a element of a vector space of unsigned points.
+pub fn UnsignedPoint(N: comptime_int) type {
     return @Vector(N, usize);
+}
+
+/// Represents a element of a vector space of signed points.
+pub fn SignedPoint(N: comptime_int) type {
+    return @Vector(N, isize);
 }
