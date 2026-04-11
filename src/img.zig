@@ -311,3 +311,55 @@ pub fn UnsignedPoint(N: comptime_int) type {
 pub fn SignedPoint(N: comptime_int) type {
     return @Vector(N, isize);
 }
+
+test "from xml" {
+    const str =
+        \\<RT3>
+        \\    <lookat look_from="0 0 -7" look_at="0 0 0" up="0 1 0" />
+        \\    <camera type="orthographic" screen_window="-5.3 5.3 -4 4"/>
+        \\    <integrator type="flat" />
+        \\    <film type="image" width="200" height="100" filename="simple_bkg.png" img_type="png" />
+        \\    <world_begin/>
+        \\        <background type="single_color" color="153 204 255"/>
+        \\    <world_end/>
+        \\</RT3>
+    ;
+    const expected = Scene{
+        .camera = .{
+            .orthographic = .{
+                .left = -5.3,
+                .right = 5.3,
+                .bottom = -4,
+                .top = 4,
+            },
+        },
+        .lookat = .{
+            .from = .{ 0, 0, -7 },
+            .at = .{ 0, 0, 0 },
+            .up = .{ 0, 1, 0 },
+        },
+        .integrator = .flat,
+        .film = .{
+            .typ = .image,
+            .width = 200,
+            .height = 100,
+            .filename = "simple_bkg.png",
+            .img_type = .png,
+        },
+        .world = .{
+            .background = .{
+                .single_color = .{
+                    .color = .{
+                        .r = 153,
+                        .g = 204,
+                        .b = 255,
+                    },
+                },
+            },
+        },
+    };
+    var root = try xml.parse(str, std.testing.allocator);
+    defer root.deinit(std.testing.allocator);
+    const actual = try Scene.fromXml(&root);
+    try std.testing.expectEqualDeep(expected, actual);
+}
