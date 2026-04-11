@@ -13,10 +13,29 @@ pub const Color = struct {
     g: u8 = 0,
     b: u8 = 0,
 
-    // TODO: Possibly add support for hexadecimal values.
+    const color_log = std.log.scoped(.color);
+
     pub fn fromStr(str: ?[]const u8) !@This() {
+        const clamp = std.math.clamp;
+
         if (str == null or str.?.len == 0) return .{};
-        const arr = try xml.parseUnsignedArray(u8, 3, str.?);
+
+        const arr = if (xml.parseUnsignedArray(u8, 3, str.?)) |arr|
+            arr
+        else |_| blk: {
+            const arr = try xml.parseFloatArray(f32, 3, str.?);
+            inline for (arr) |v| {
+                if (v < 0 or v > 1) {
+                    color_log.err("a float color channel should be a value in [0, 1], found {d}", .{v});
+                    return error.InvalidColorFloatValue;
+                }
+            }
+            break :blk .{
+                clamp(@as(u8, @intFromFloat(arr[0] * 255)), 0, 255),
+                clamp(@as(u8, @intFromFloat(arr[1] * 255)), 0, 255),
+                clamp(@as(u8, @intFromFloat(arr[2] * 255)), 0, 255),
+            };
+        };
         return .{ .r = arr[0], .g = arr[1], .b = arr[2] };
     }
 
