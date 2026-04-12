@@ -9,8 +9,10 @@ const Real = vec.Real;
 const img = @import("img.zig");
 const Color = img.Color;
 const bilerp = img.bilerp;
-
 const Material = @import("Material.zig");
+const Object = @import("Object.zig").Object;
+
+const World = @This();
 
 background: Background = .{ .single_color = .{} },
 material: Material = .{},
@@ -23,6 +25,7 @@ pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() 
     const options = .{
         .background = &world.background,
         .material = &world.material,
+        .objects = &world.objects,
     };
     if (try xml.parseChildren(allocator, options, elem)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
@@ -31,6 +34,28 @@ pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() 
     }
     return world;
 }
+
+const ObjectNode = struct {
+    object: Object,
+    node: std.DoublyLinkedList.Node = .{},
+};
+
+const ObjectList = struct {
+    const Self = @This();
+
+    list: std.DoublyLinkedList = .{},
+
+    pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() {
+        var list = std.DoublyLinkedList{};
+        while (elem.nextSiblingElement()) |s| {
+            if (!eql(u8, s.key, "object")) continue;
+            const ptr = try allocator.create(ObjectNode);
+            ptr.*.object = try .fromXml(s);
+            list.append(&ptr.node);
+        }
+        return ObjectList{ .list = list };
+    }
+};
 
 pub const Background = union(enum) {
     single_color: struct {
@@ -82,3 +107,67 @@ pub const Background = union(enum) {
         };
     }
 };
+
+const testing = std.testing;
+
+test "from xml" {
+    const str =
+        \\ <world>
+        \\    <background type="single_color" color="255 0xff 0xf0" />
+        \\    <material type="flat" color="0.95 0.05 0.05" />
+        \\    <objects>
+        \\         <object type="sphere" radius="0.4" center="-1 0.5 5" />
+        \\         <object type="sphere" radius="0.4" center="1 -0.5 8" />
+        \\    </objects>
+        \\ </world>
+    ;
+    var obj1 = ObjectNode{
+        .object = .{
+            .sphere = .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
+        },
+    };
+    var obj2 = ObjectNode{
+        .object = .{
+            .sphere = .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
+        },
+    };
+    var objs = ObjectList{};
+    objs.list.append(&obj1.node);
+    objs.list.append(&obj2.node);
+    const expected = World{
+        .material = .{
+            .typ = .flat,
+            .color = .{ .r = 242, .b = 12, .g = 12 },
+        },
+        .background = .{
+            .single_color = .{
+                .color = .{ .r = 255, .g = 0xff, .b = 0xf0 },
+            },
+        },
+        .objects = objs,
+    };
+
+    var root = try xml.parse(str, testing.allocator);
+    defer root.deinit(testing.allocator);
+    const actual = try World.fromXml(testing.allocator, &root);
+    try testing.expectEqualDeep(expected.material, actual.material);
+    try testing.expectEqualDeep(expected.background, actual.background);
+    try expecEqualObjectList(expected.objects, actual.objects);
+}
+
+fn expecEqualObjectList(
+    expected: ObjectList,
+    actual: ObjectList,
+) !void {
+    try testing.expectEqual(expected.list.len(), expected.list.len());
+    var e = expected.list.first;
+    var a = actual.list.first;
+    while (e != null and a != null) : ({
+        e = e.?.next;
+        a = a.?.next;
+    }) {
+        const ee: *ObjectNode = @alignCast(@fieldParentPtr("node", e.?));
+        const ae: *ObjectNode = @alignCast(@fieldParentPtr("node", a.?));
+        try testing.expectEqualDeep(ee.object, ae.object);
+    }
+}
