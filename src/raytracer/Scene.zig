@@ -65,13 +65,17 @@ pub fn fromXml(allocator: std.mem.Allocator, root: *const xml.Element) !@This() 
 }
 
 /// Returns the array form of color of a given pixel in a image file.
-pub fn render(self: *const @This(), x: u32, y: u32) [3]u8 {
-    const color = self.world.background.ptColor(
-        self.film.width,
-        self.film.height,
-        .{ @floatFromInt(x), @floatFromInt(y) },
-    );
-    std.debug.print("ray: {}\n", .{self.camera.generateRay(x, y, self.look.normalFrame(), self.film)});
+pub fn render(self: *const Scene, x: u32, y: u32) [3]u8 {
+    const ray = self.camera.generateRay(x, y, self.look.normalFrame(), self.film);
+    // log.debug("pixel: {} ray: {}", .{ .{ x, y }, ray });
+    const color = if (self.world.intersect(&ray)) |c|
+        c
+    else
+        self.world.background.ptColor(
+            self.film.width,
+            self.film.height,
+            .{ @floatFromInt(x), @floatFromInt(y) },
+        );
     return .{ color.r, color.g, color.b };
 }
 

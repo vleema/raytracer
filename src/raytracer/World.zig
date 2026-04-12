@@ -11,6 +11,7 @@ const Color = img.Color;
 const bilerp = img.bilerp;
 const Material = @import("Material.zig");
 const Object = @import("Object.zig").Object;
+const Ray = @import("Ray.zig");
 
 const World = @This();
 
@@ -20,7 +21,7 @@ objects: ObjectList = .{},
 
 const log = std.log.scoped(.world);
 
-pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() {
+pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !World {
     var world = @This(){};
     const options = .{
         .background = &world.background,
@@ -33,6 +34,15 @@ pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() 
         return error.UnrecognizedWorldValue;
     }
     return world;
+}
+
+pub fn intersect(self: *const World, r: *const Ray) ?Color {
+    var node = self.objects.list.first;
+    while (node) |n| : (node = n.next) {
+        const obj: *const ObjectNode = @alignCast(@fieldParentPtr("node", n));
+        if (obj.object.intersect(r)) return self.material.color;
+    }
+    return null;
 }
 
 pub fn deinit(self: *World, allocator: std.mem.Allocator) void {
