@@ -13,92 +13,12 @@ const Ray = @import("Ray.zig");
 const log = std.log.scoped(.camera);
 
 pub const Camera = union(enum) {
-    spherical: enum {
-        equirectangular,
-        equal_area,
+    spherical: Spherical,
+    rectangular: Rectangular,
 
-        fn generateRay(
-            self: *const @This(),
-            img_x: f64,
-            img_y: f64,
-            width: f64,
-            height: f64,
-            frame: Frame,
-        ) Ray {
-            const phi = 2.0 * math.pi * img_x / width;
-            return switch (self.*) {
-                .equirectangular => blk: {
-                    const theta = math.pi * img_y / height;
-                    break :blk Ray{
-                        .origin = frame.origin,
-                        .direction = vec.sphericalDirection(@sin(theta), @cos(theta), phi),
-                    };
-                },
-                .equal_area => blk: {
-                    const cos_theta = 1.0 - 2.0 * img_y / height;
-                    const sin_theta = @sqrt(1.0 - cos_theta * cos_theta);
-                    break :blk Ray{
-                        .origin = frame.origin,
-                        .direction = vec.sphericalDirection(sin_theta, cos_theta, phi),
-                    };
-                },
-            };
-        }
-    },
-    rectangular: union(enum) {
-        orthographic: ScreenWindow,
-        perspective: struct {
-            fovy: u32 = 30,
-        },
-
-        const ScreenWindow = struct {
-            left: f64 = -5.3,
-            right: f64 = 5.3,
-            bottom: f64 = -4,
-            top: f64 = 4,
-        };
-
-        fn generateRay(
-            self: *const @This(),
-            img_x: f64,
-            img_y: f64,
-            width: f64,
-            height: f64,
-            frame: Frame,
-        ) Ray {
-            const aspect_ratio = width / height;
-            const sw = self.screenWindow(aspect_ratio);
-            const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * img_x / width);
-            const sw_y: Real(3) = @splat(sw.bottom + (sw.top - sw.bottom) * img_y / height);
-
-            return switch (self.*) {
-                .orthographic => |_| Ray{
-                    .origin = frame.origin + sw_x * frame.right + sw_y * frame.orientation,
-                    .direction = frame.direction,
-                },
-                .perspective => |_| Ray{
-                    .origin = frame.origin,
-                    .direction = frame.direction + sw_x * frame.right + sw_y * frame.orientation,
-                },
-            };
-        }
-
-        fn screenWindow(self: *const @This(), aspect_ratio: f64) ScreenWindow {
-            return switch (self.*) {
-                .orthographic => |e| e,
-                .perspective => |p| blk: {
-                    const h = std.math.tan(@as(f64, @floatFromInt(p.fovy)) / 2.0);
-                    break :blk ScreenWindow{
-                        .left = -aspect_ratio * h,
-                        .right = aspect_ratio * h,
-                        .top = h,
-                        .bottom = -h,
-                    };
-                },
-            };
-        }
-    },
-
+    /// Generates a ray coming out of the `Camera`.
+    ///
+    /// Returns the generated ray.
     pub fn generateRay(
         self: *const @This(),
         img_x: u32,
@@ -148,6 +68,93 @@ pub const Camera = union(enum) {
         }
         log.err("expected one of ['perspective', 'orthographic', 'spherical'], found {s}", .{typ});
         return error.InvalidCameraType;
+    }
+};
+
+const Rectangular = union(enum) {
+    orthographic: ScreenWindow,
+    perspective: struct {
+        fovy: u32 = 30,
+    },
+
+    const ScreenWindow = struct {
+        left: f64 = -5.3,
+        right: f64 = 5.3,
+        bottom: f64 = -4,
+        top: f64 = 4,
+    };
+
+    fn generateRay(
+        self: *const @This(),
+        img_x: f64,
+        img_y: f64,
+        width: f64,
+        height: f64,
+        frame: Frame,
+    ) Ray {
+        const aspect_ratio = width / height;
+        const sw = self.screenWindow(aspect_ratio);
+        const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * img_x / width);
+        const sw_y: Real(3) = @splat(sw.bottom + (sw.top - sw.bottom) * img_y / height);
+
+        return switch (self.*) {
+            .orthographic => |_| Ray{
+                .origin = frame.origin + sw_x * frame.right + sw_y * frame.orientation,
+                .direction = frame.direction,
+            },
+            .perspective => |_| Ray{
+                .origin = frame.origin,
+                .direction = frame.direction + sw_x * frame.right + sw_y * frame.orientation,
+            },
+        };
+    }
+
+    fn screenWindow(self: *const @This(), aspect_ratio: f64) ScreenWindow {
+        return switch (self.*) {
+            .orthographic => |e| e,
+            .perspective => |p| blk: {
+                const h = std.math.tan(@as(f64, @floatFromInt(p.fovy)) / 2.0);
+                break :blk ScreenWindow{
+                    .left = -aspect_ratio * h,
+                    .right = aspect_ratio * h,
+                    .top = h,
+                    .bottom = -h,
+                };
+            },
+        };
+    }
+};
+
+const Spherical = enum {
+    equirectangular,
+    equal_area,
+
+    fn generateRay(
+        self: *const @This(),
+        img_x: f64,
+        img_y: f64,
+        width: f64,
+        height: f64,
+        frame: Frame,
+    ) Ray {
+        const phi = 2.0 * math.pi * img_x / width;
+        return switch (self.*) {
+            .equirectangular => blk: {
+                const theta = math.pi * img_y / height;
+                break :blk Ray{
+                    .origin = frame.origin,
+                    .direction = vec.sphericalDirection(@sin(theta), @cos(theta), phi),
+                };
+            },
+            .equal_area => blk: {
+                const cos_theta = 1.0 - 2.0 * img_y / height;
+                const sin_theta = @sqrt(1.0 - cos_theta * cos_theta);
+                break :blk Ray{
+                    .origin = frame.origin,
+                    .direction = vec.sphericalDirection(sin_theta, cos_theta, phi),
+                };
+            },
+        };
     }
 };
 
