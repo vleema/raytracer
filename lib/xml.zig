@@ -100,10 +100,9 @@ pub const Element = struct {
     /// Fetches the first child element that has the specified key `key`.
     pub fn firstChildElement(self: *const Self, key: []const u8) ?*const Element {
         var node = self.values.first;
-        return while (node) |n| {
+        return while (node) |n| : (node = n.next) {
             const v: *Element = @fieldParentPtr("node", n);
             if (std.mem.eql(u8, v.key, key)) break v;
-            node = n.next;
         } else null;
     }
 
@@ -116,12 +115,11 @@ pub const Element = struct {
     /// Queries the key and optionally value of an attribute inside the xml element.
     pub fn queryAttribute(self: *const Self, key: []const u8, value: ?[]const u8) ?[]const u8 {
         var node = self.attrs.first;
-        return while (node) |n| {
+        return while (node) |n| : (node = n.next) {
             const a: *Attribute = @fieldParentPtr("node", n);
             if (std.mem.eql(u8, a.key, key) and
                 (value == null or
                     std.mem.eql(u8, value.?, a.value))) return a.value;
-            node = n.next;
         } else null;
     }
 
@@ -143,8 +141,7 @@ pub const Element = struct {
             try w.print("\n", .{});
             newindent += 2;
             var node: ?*List.Node = fst;
-            while (node) |n| {
-                defer node = n.next;
+            while (node) |n| : (node = n.next) {
                 const attr: *Attribute = @fieldParentPtr("node", n);
                 try attr.fmt(w, newindent, buf);
                 try w.print(",\n", .{});
@@ -158,8 +155,7 @@ pub const Element = struct {
             try w.print("\n", .{});
             newindent += 2;
             var node: ?*List.Node = fst;
-            while (node) |n| {
-                defer node = n.next;
+            while (node) |n| : (node = n.next) {
                 const val: *Element = @fieldParentPtr("node", n);
                 try val.fmt(w, newindent, buf);
                 try w.print(",\n", .{});
