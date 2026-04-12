@@ -41,14 +41,14 @@
         buildInputs = [pkgs.zlib];
       in {
         # nix develop
-        devshells = {
+        devShells = {
           default = pkgs.mkShell {
+            inherit buildInputs;
             packages = with pkgs; [
               zig
               zls
               zig-zlint
               zigimports
-              lldb
             ];
           };
         };
@@ -59,7 +59,7 @@
             name = pname;
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-              zig build -Doptimize=ReleaseSafe --prefix $out
+              zig build -Doptimize=ReleaseFast --prefix $out
             '';
             nativeBuildInputs = [pkgs.zig];
           };
