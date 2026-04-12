@@ -36,7 +36,7 @@ pub const Sphere = struct {
         const oc = self.center - r.origin;
         const a = vec.dot(3, f64, r.direction, r.direction);
         const b = -2.0 * vec.dot(3, f64, r.direction, oc);
-        const c = vec.dot(3, f64, oc, oc);
+        const c = vec.dot(3, f64, oc, oc) - self.radius * self.radius;
         const discriminant = b * b - 4 * a * c;
         return discriminant >= 0;
     }
@@ -73,3 +73,4 @@ test "object: sphere" {
     const actual = try Object.fromXml(root.firstChildElement("object").?);
     try testing.expectEqualDeep(expected, actual);
 }
+
