@@ -194,12 +194,17 @@ pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
     return elem;
 }
 
+// TODO: Impl a analogous for the attributes.
 /// Iterates `elem`'s children and dispatches each to the matching field in `options`.
 /// Field names of `options` are the XML element keys; field values are pointers to targets.
 /// Each target type must implement either `fromXml(*const Element) !T`
 /// or `fromXml(Allocator, *const Element) !T` — the allocator is passed only when needed.
 /// Returns the key of the first unrecognized child, or null on success.
-pub fn parseChildren(allocator: std.mem.Allocator, options: anytype, elem: *const Element) !?[]const u8 {
+pub fn parseChildren(
+    allocator: std.mem.Allocator,
+    options: anytype,
+    elem: *const Element,
+) !?[]const u8 {
     const fields = @typeInfo(@TypeOf(options)).@"struct".fields;
     var node = elem.values.first;
     while (node) |n| : (node = n.next) {
