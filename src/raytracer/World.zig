@@ -1,7 +1,7 @@
-const xml = @import("xml");
-
 const std = @import("std");
 const eql = std.mem.eql;
+
+const xml = @import("xml");
 
 const vec = @import("vec");
 const Real = vec.Real;
@@ -14,16 +14,17 @@ const Material = @import("Material.zig");
 
 background: Background = .{ .single_color = .{} },
 material: Material = .{},
+objects: ObjectList = .{},
 
 const log = std.log.scoped(.world);
 
-pub fn fromXml(elem: *const xml.Element) !@This() {
+pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() {
     var world = @This(){};
     const options = .{
         .background = &world.background,
         .material = &world.material,
     };
-    if (try xml.parseChildren(options, elem)) |unknown| {
+    if (try xml.parseChildren(allocator, options, elem)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
         log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
         return error.UnrecognizedWorldValue;

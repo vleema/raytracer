@@ -32,7 +32,7 @@ pub fn fromXmlFile(allocator: std.mem.Allocator, file: std.fs.File) !Scene {
     var root = try xml.parse(mmap, allocator);
     defer root.deinit(allocator);
 
-    return fromXml(&root);
+    return fromXml(allocator, &root);
 }
 
 /// Writes the scene into a file under `dir`.
@@ -47,7 +47,7 @@ pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs
 }
 
 /// Creates a scene from a `xml.Element`.
-pub fn fromXml(root: *const xml.Element) !@This() {
+pub fn fromXml(allocator: std.mem.Allocator, root: *const xml.Element) !@This() {
     var scene = @This(){};
     const options = .{
         .camera = &scene.camera,
@@ -56,7 +56,7 @@ pub fn fromXml(root: *const xml.Element) !@This() {
         .film = &scene.film,
         .world = &scene.world,
     };
-    if (try xml.parseChildren(options, root)) |unknown| {
+    if (try xml.parseChildren(allocator, options, root)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
         log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
         return error.UnrecognizedOption;
@@ -125,6 +125,6 @@ test "from xml" {
     };
     var root = try xml.parse(str, std.testing.allocator);
     defer root.deinit(std.testing.allocator);
-    const actual = try Scene.fromXml(&root);
+    const actual = try Scene.fromXml(std.testing.allocator, &root);
     try std.testing.expectEqualDeep(expected, actual);
 }

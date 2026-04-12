@@ -196,20 +196,25 @@ pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
 
 /// Iterates `elem`'s children and dispatches each to the matching field in `options`.
 /// Field names of `options` are the XML element keys; field values are pointers to targets.
-/// Each target type must implement `fromXml(*const xml.Element) !T`.
+/// Each target type must implement either `fromXml(*const Element) !T`
+/// or `fromXml(Allocator, *const Element) !T` — the allocator is passed only when needed.
 /// Returns the key of the first unrecognized child, or null on success.
-pub fn parseChildren(options: anytype, elem: *const Element) !?[]const u8 {
+pub fn parseChildren(allocator: std.mem.Allocator, options: anytype, elem: *const Element) !?[]const u8 {
     const fields = @typeInfo(@TypeOf(options)).@"struct".fields;
     var node = elem.values.first;
-    while (node) |n| {
+    while (node) |n| : (node = n.next) {
         const child: *const Element = @fieldParentPtr("node", n);
-        node = n.next;
         var matched = false;
 
         inline for (fields) |f| {
             if (!matched and std.mem.eql(u8, f.name, child.key)) {
                 const ptr = @field(options, f.name);
-                ptr.* = try .fromXml(child);
+                const T = @TypeOf(ptr.*);
+                const nparams = @typeInfo(@TypeOf(T.fromXml)).@"fn".params.len;
+                ptr.* = if (nparams == 2)
+                    try T.fromXml(allocator, child)
+                else
+                    try T.fromXml(child);
                 matched = true;
             }
         }
