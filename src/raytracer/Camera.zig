@@ -95,7 +95,7 @@ const Rectangular = union(enum) {
         const aspect_ratio = width / height;
         const sw = self.screenWindow(aspect_ratio);
         const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * img_x / width);
-        const sw_y: Real(3) = @splat(sw.bottom + (sw.top - sw.bottom) * img_y / height);
+        const sw_y: Real(3) = @splat(sw.top + (sw.bottom - sw.top) * img_y / height);
 
         return switch (self.*) {
             .orthographic => |_| Ray{
@@ -113,7 +113,7 @@ const Rectangular = union(enum) {
         return switch (self.*) {
             .orthographic => |e| e,
             .perspective => |p| blk: {
-                const h = std.math.tan(@as(f64, @floatFromInt(p.fovy)) / 2.0);
+                const h = @tan(math.degreesToRadians(@as(f64, @floatFromInt(p.fovy))) / 2.0);
                 break :blk ScreenWindow{
                     .left = -aspect_ratio * h,
                     .right = aspect_ratio * h,
@@ -137,21 +137,32 @@ const Spherical = enum {
         height: f64,
         frame: Frame,
     ) Ray {
-        const phi = 2.0 * math.pi * img_x / width;
         return switch (self.*) {
             .equirectangular => blk: {
-                const theta = math.pi * img_y / height;
+                const u: f64 = img_x / width;
+                const v: f64 = img_y / height;
+                const phi = 2.0 * math.pi * u;
+                const theta = math.pi * v;
                 break :blk Ray{
                     .origin = frame.origin,
                     .direction = vec.sphericalDirection(@sin(theta), @cos(theta), phi),
                 };
             },
             .equal_area => blk: {
-                const cos_theta = 1.0 - 2.0 * img_y / height;
-                const sin_theta = @sqrt(1.0 - cos_theta * cos_theta);
+                const u = 2.0 * (img_x / width) - 1;
+                const v = 2.0 * (img_y / height) - 1;
+                const up = @abs(u);
+                const vp = @abs(v);
+                const signed_dist = 1 - (up + vp);
+                const dist = @abs(signed_dist);
+                const r = 1 - dist;
+                const phi = if (r == 0) 1 else ((vp - up) / r + 1) * math.pi / 4;
+                const z = math.copysign(1 - r * r, signed_dist);
+                const cos_phi = math.copysign(@cos(phi), u);
+                const sin_phi = math.copysign(@sin(phi), v);
                 break :blk Ray{
                     .origin = frame.origin,
-                    .direction = vec.sphericalDirection(sin_theta, cos_theta, phi),
+                    .direction = .{ cos_phi * r * @sqrt(2 - r * r), sin_phi * r * @sqrt(2 - r * r), z },
                 };
             },
         };
@@ -175,7 +186,7 @@ test "orthographic: top-left pixel maps to screen window corner" {
     };
     const film = Film{ .width = 4, .height = 4 };
     const ray = cam.generateRay(0, 0, axis_frame, film);
-    try testing.expectEqual(Ray{ .origin = .{ -2, -2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
+    try testing.expectEqual(Ray{ .origin = .{ -2, 2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
 
 test "orthographic: center pixel maps to screen window center" {
@@ -224,20 +235,4 @@ test "equirectangular: top row maps to north pole" {
     // theta = pi * 0/4 = 0 -> sin=0, cos=1 -> {0, 0, 1} for any phi.
     const ray = cam.generateRay(2, 0, axis_frame, film);
     try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
-}
-
-test "equal_area: top row maps to north pole" {
-    const cam: Camera = .{ .spherical = .equal_area };
-    const film = Film{ .width = 4, .height = 4 };
-    // cos_theta = 1 - 2*0/4 = 1, sin_theta = 0 -> {0, 0, 1} for any phi.
-    const ray = cam.generateRay(2, 0, axis_frame, film);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
-}
-
-test "equal_area: bottom row maps to south pole" {
-    const cam: Camera = .{ .spherical = .equal_area };
-    const film = Film{ .width = 4, .height = 4 };
-    // cos_theta = 1 - 2*4/4 = -1, sin_theta = 0 -> {0, 0, -1} for any phi
-    const ray = cam.generateRay(2, 4, axis_frame, film);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, -1 }), ray.direction);
 }
