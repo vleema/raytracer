@@ -35,6 +35,13 @@ pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() 
     return world;
 }
 
+pub fn deinit(self: *World, allocator: std.mem.Allocator) void {
+    while (self.objects.list.popFirst()) |n| {
+        const ptr: *ObjectNode = @alignCast(@fieldParentPtr("node", n));
+        allocator.destroy(ptr);
+    }
+}
+
 const ObjectNode = struct {
     object: Object,
     node: std.DoublyLinkedList.Node = .{},
@@ -47,10 +54,12 @@ const ObjectList = struct {
 
     pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() {
         var list = std.DoublyLinkedList{};
-        while (elem.nextSiblingElement()) |s| {
-            if (!eql(u8, s.key, "object")) continue;
+        var node = elem.values.first;
+        while (node) |n| : (node = n.next) {
+            const c: *const xml.Element = @fieldParentPtr("node", n);
+            if (!eql(u8, c.key, "object")) continue;
             const ptr = try allocator.create(ObjectNode);
-            ptr.*.object = try .fromXml(s);
+            ptr.*.object = try .fromXml(c);
             list.append(&ptr.node);
         }
         return ObjectList{ .list = list };
@@ -110,7 +119,7 @@ pub const Background = union(enum) {
 
 const testing = std.testing;
 
-test "from xml" {
+test "world: with object list" {
     const str =
         \\ <world>
         \\    <background type="single_color" color="255 0xff 0xf0" />
@@ -128,7 +137,7 @@ test "from xml" {
     };
     var obj2 = ObjectNode{
         .object = .{
-            .sphere = .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
+            .sphere = .{ .radius = 0.4, .center = .{ 1.0, -0.5, 8.0 } },
         },
     };
     var objs = ObjectList{};
@@ -149,7 +158,9 @@ test "from xml" {
 
     var root = try xml.parse(str, testing.allocator);
     defer root.deinit(testing.allocator);
-    const actual = try World.fromXml(testing.allocator, &root);
+    var actual = try World.fromXml(testing.allocator, &root);
+    defer actual.deinit(testing.allocator);
+
     try testing.expectEqualDeep(expected.material, actual.material);
     try testing.expectEqualDeep(expected.background, actual.background);
     try expecEqualObjectList(expected.objects, actual.objects);

@@ -75,6 +75,10 @@ pub fn render(self: *const @This(), x: u32, y: u32) [3]u8 {
     return .{ color.r, color.g, color.b };
 }
 
+pub fn deinit(self: *Scene, allocator: std.mem.Allocator) void {
+    self.world.deinit(allocator);
+}
+
 test "from xml" {
     const str =
         \\<RT3>
@@ -125,6 +129,7 @@ test "from xml" {
     };
     var root = try xml.parse(str, std.testing.allocator);
     defer root.deinit(std.testing.allocator);
-    const actual = try Scene.fromXml(std.testing.allocator, &root);
+    var actual = try Scene.fromXml(std.testing.allocator, &root);
+    defer actual.deinit(std.testing.allocator);
     try std.testing.expectEqualDeep(expected, actual);
 }
