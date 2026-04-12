@@ -3,10 +3,6 @@ const xml = @import("xml");
 const png = @import("png");
 const ppm = @import("ppm");
 
-const img = @import("img.zig");
-const Ray = img.Ray;
-const Color = img.Color;
-
 const Camera = @import("Camera.zig").Camera;
 const Film = @import("Film.zig");
 const Integrator = @import("Integrator.zig").Integrator;

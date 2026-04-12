@@ -8,7 +8,6 @@ const Real = vec.Real;
 
 const img = @import("img.zig");
 const Color = img.Color;
-const bilerp = img.bilerp;
 const Material = @import("Material.zig");
 const Object = @import("Object.zig").Object;
 const Ray = @import("Ray.zig");

@@ -1,6 +1,4 @@
 const std = @import("std");
-const ppm = @import("ppm");
-const png = @import("png");
 const raytracer = @import("raytracer.zig");
 
 // TODO: Implement utilities for cmdline arg parsing.
