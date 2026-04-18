@@ -1,6 +1,6 @@
 # Raytracer project - Computer Graphics
 
-Make sure you have zig 0.15.2, libc and zlib installed before building. Use:
+Make sure you have zig 0.16.0, libc and zlib installed before building. Use:
 
 ```bash
 zig build -Doptimize=ReleaseSafe

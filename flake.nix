@@ -2,7 +2,7 @@
   description = "Raytracer made in zig";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -39,13 +39,13 @@
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
         buildInputs = [pkgs.zlib];
+        nativeBuildInputs = [pkgs.zig_0_16];
       in {
         # nix develop
         devShells = {
           default = pkgs.mkShell {
-            inherit buildInputs;
+            inherit buildInputs nativeBuildInputs;
             packages = with pkgs; [
-              zig
               zls
               zig-zlint
               zigimports
@@ -55,21 +55,19 @@
         # nix build
         packages = {
           default = pkgs.stdenv.mkDerivation {
-            inherit version src meta buildInputs;
+            inherit version src meta buildInputs nativeBuildInputs;
             name = pname;
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
               zig build -Doptimize=ReleaseFast --prefix $out
             '';
-            nativeBuildInputs = [pkgs.zig];
           };
         };
         # nix flake check
         checks = {
           tests = pkgs.stdenv.mkDerivation {
-            inherit version src buildInputs;
+            inherit version src buildInputs nativeBuildInputs;
             pname = "${pname}-tests";
-            nativeBuildInputs = [pkgs.zig];
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
               zig build test --summary all
@@ -78,7 +76,7 @@
           lint = pkgs.stdenv.mkDerivation {
             inherit version src buildInputs;
             pname = "${pname}-lint";
-            nativeBuildInputs = with pkgs; [zig zig-zlint];
+            nativeBuildInputs = with pkgs; [zig-zlint] ++ nativeBuildInputs;
             buildPhase = ''zlint'';
           };
         };
