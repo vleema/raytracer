@@ -20,9 +20,9 @@ world: World = .{},
 const log = std.log.scoped(.scene);
 
 /// Creates a scene from a xml file.
-pub fn fromXmlFile(allocator: std.mem.Allocator, file: std.fs.File) !Scene {
-    const md = try file.stat();
-    const mmap = try std.posix.mmap(null, md.size, std.posix.PROT.READ, .{ .TYPE = .PRIVATE }, file.handle, 0);
+pub fn fromXmlFile(allocator: std.mem.Allocator, io: std.Io, file: std.Io.File) !Scene {
+    const md = try file.stat(io);
+    const mmap = try std.posix.mmap(null, md.size, .{ .READ = true }, .{ .TYPE = .PRIVATE }, file.handle, 0);
     defer std.posix.munmap(mmap);
 
     var root = try xml.parse(mmap, allocator);
@@ -32,13 +32,13 @@ pub fn fromXmlFile(allocator: std.mem.Allocator, file: std.fs.File) !Scene {
 }
 
 /// Writes the scene into a file under `dir`.
-pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, dir: std.fs.Dir) !void {
-    var out = try dir.createFile(self.film.filename, .{});
-    defer out.close();
+pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, io: std.Io, dir: std.Io.Dir) !void {
+    var out = try dir.createFile(io, self.film.filename, .{});
+    defer out.close(io);
 
     switch (self.film.img_type) {
-        .png => try png.writeTrueColor8(allocator, &out, self.film.width, self.film.height, self),
-        .ppm => try ppm.writeP6(&out, self.film.width, self.film.height, self),
+        .png => try png.writeTrueColor8(allocator, io, out, self.film.width, self.film.height, self),
+        .ppm => try ppm.writeP6(io, out, self.film.width, self.film.height, self),
     }
 }
 

@@ -5,13 +5,14 @@ const std = @import("std");
 /// The `renderer` should have a method `render(self, x: u32, y: u32) [3]u8`.
 /// The `render` function will be used to compute the color of each iterated pixel.
 pub fn writeP6(
-    file: *std.fs.File,
+    io: std.Io,
+    file: std.Io.File,
     width: u32,
     height: u32,
     renderer: anytype,
 ) !void {
     var buf: [1 << 16]u8 = undefined;
-    var fw = file.writer(&buf);
+    var fw = file.writer(io, &buf);
     const w = &fw.interface;
 
     try w.print("P6\n", .{});

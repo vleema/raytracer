@@ -12,13 +12,14 @@ const Endian = std.builtin.Endian;
 /// The `render` function will be used to compute the color of each iterated pixel.
 pub fn writeTrueColor8(
     allocator: std.mem.Allocator,
-    file: *std.fs.File,
+    io: std.Io,
+    file: std.Io.File,
     width: u32,
     height: u32,
     renderer: anytype,
 ) !void {
     var file_writer_buf: [1 << 16]u8 = undefined;
-    var file_writer = file.writer(&file_writer_buf);
+    var file_writer = file.writer(io, &file_writer_buf);
     const file_writer_interface = &file_writer.interface;
 
     // PNG magic.

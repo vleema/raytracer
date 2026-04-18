@@ -98,11 +98,11 @@ const Rectangular = union(enum) {
         const sw_y: Real(3) = @splat(sw.top + (sw.bottom - sw.top) * img_y / height);
 
         return switch (self.*) {
-            .orthographic => |_| Ray{
+            .orthographic => Ray{
                 .origin = frame.origin + sw_x * frame.right + sw_y * frame.orientation,
                 .direction = frame.direction,
             },
-            .perspective => |_| Ray{
+            .perspective => Ray{
                 .origin = frame.origin,
                 .direction = frame.direction + sw_x * frame.right + sw_y * frame.orientation,
             },
