@@ -51,10 +51,10 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&tests.step);
 
     const libs = &.{
-        .{ .name = "vec", .path = "lib/vec.zig", .link_libc = false, .deps = .{ .system = &.{} } },
-        .{ .name = "xml", .path = "lib/xml.zig", .link_libc = false, .deps = .{ .system = &.{} } },
-        .{ .name = "ppm", .path = "lib/ppm.zig", .link_libc = false, .deps = .{ .system = &.{} } },
-        .{ .name = "png", .path = "lib/png.zig", .link_libc = true, .deps = .{ .system = &.{"z"} } },
+        .{ .name = "vec", .path = "lib/vec.zig" },
+        .{ .name = "xml", .path = "lib/xml.zig" },
+        .{ .name = "ppm", .path = "lib/ppm.zig" },
+        .{ .name = "png", .path = "lib/png.zig" },
     };
 
     inline for (libs) |lib| {
@@ -75,10 +75,6 @@ fn addLib(
         .optimize = mod.optimize.?,
     });
     const tests = b.addTest(.{ .root_module = lib });
-    inline for (opts.deps.system) |dep| {
-        lib.linkSystemLibrary(dep, .{});
-    }
-    if (opts.link_libc) lib.link_libc = true;
     mod.addImport(opts.name, lib);
     test_step.dependOn(&b.addRunArtifact(tests).step);
     check_step.dependOn(&tests.step);

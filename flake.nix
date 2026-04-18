@@ -38,7 +38,7 @@
     flake-utils.lib.eachSystem supportedSystems (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
-        buildInputs = [pkgs.zlib];
+        buildInputs = [];
         nativeBuildInputs = [pkgs.zig_0_16];
       in {
         # nix develop

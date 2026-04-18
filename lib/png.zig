@@ -1,9 +1,7 @@
 // TODO: Possibly use pure zig implementation of zlib.
 
-const zlib = @cImport({
-    @cInclude("zlib.h");
-});
 const std = @import("std");
+const flate = std.compress.flate;
 const Endian = std.builtin.Endian;
 
 /// Writes a true color PNG with 8 as bit depth using the method `render` from a `renderer`.
@@ -40,23 +38,6 @@ pub fn writeTrueColor8(
     try writeChunk(file_writer_interface, "IHDR".*, &ihdr_data);
 
     // IDAT chunk.
-    var stream: zlib.z_stream = std.mem.zeroes(zlib.z_stream);
-    var stream_buf: [1 << 16]u8 = undefined;
-
-    const zlib_init_err = zlib.deflateInit2(
-        &stream,
-        zlib.Z_BEST_COMPRESSION,
-        zlib.Z_DEFLATED,
-        15,
-        8,
-        zlib.Z_FILTERED,
-    );
-    if (zlib_init_err != zlib.Z_OK) return error.ZlibInitFailed;
-    defer _ = zlib.deflateEnd(&stream);
-
-    var output = try std.ArrayList(u8).initCapacity(allocator, height * (width * 3 + 1));
-    defer output.deinit(allocator);
-
     var scanline = try std.ArrayList(u8).initCapacity(allocator, width * 3 + 1);
     defer scanline.deinit(allocator);
 
@@ -70,6 +51,12 @@ pub fn writeTrueColor8(
     var scanline_candidates: [5][]u8 = undefined;
     inline for (&scanline_candidates) |*c| c.* = try allocator.alloc(u8, width * 3);
     defer inline for (&scanline_candidates) |c| allocator.free(c);
+
+    var compressed: std.Io.Writer.Allocating = try .initCapacity(allocator, height * (width + 1));
+    defer compressed.deinit();
+
+    var zlib_buf: [flate.max_window_len]u8 = undefined;
+    var zlib = try flate.Compress.init(&compressed.writer, &zlib_buf, .zlib, .best);
 
     for (0..height) |y| {
         for (0..width) |x| {
@@ -92,26 +79,15 @@ pub fn writeTrueColor8(
         scanline.appendAssumeCapacity(best_filter);
         scanline.appendSliceAssumeCapacity(scanline_candidates[best_filter]);
 
-        const flush = if (y == height - 1) zlib.Z_FINISH else zlib.Z_NO_FLUSH;
-
-        stream.next_in = scanline.items.ptr;
-        stream.avail_in = @intCast(scanline.items.len);
-
-        while (true) {
-            stream.next_out = &stream_buf;
-            stream.avail_out = @intCast(stream_buf.len);
-            _ = zlib.deflate(&stream, flush);
-
-            const produced = stream_buf.len - stream.avail_out;
-            try output.appendSlice(allocator, stream_buf[0..produced]);
-
-            if (stream.avail_out > 0) break;
-        }
+        try zlib.writer.writeAll(scanline.items);
 
         @memcpy(prev_row, raw_row);
     }
 
-    try writeChunk(file_writer_interface, "IDAT".*, output.items);
+    try zlib.writer.flush();
+    try zlib.finish();
+
+    try writeChunk(file_writer_interface, "IDAT".*, compressed.written());
     try writeChunk(file_writer_interface, "IEND".*, &.{});
 
     try file_writer_interface.flush();
