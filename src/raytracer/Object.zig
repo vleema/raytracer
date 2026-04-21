@@ -11,12 +11,6 @@ const log = std.log.scoped(.object);
 pub const Object = union(enum) {
     sphere: Sphere,
 
-    pub fn intersect(self: *const @This(), r: *const Ray) bool {
-        return switch (self.*) {
-            .sphere => |s| s.intersect(r),
-        };
-    }
-
     pub fn fromXml(elem: *const xml.Element) !@This() {
         const typ = elem.queryAttribute("type", null) orelse
             return error.ExpectedObjectType;
@@ -73,4 +67,3 @@ test "object: sphere" {
     const actual = try Object.fromXml(root.firstChildElement("object").?);
     try testing.expectEqualDeep(expected, actual);
 }
-

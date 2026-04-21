@@ -1,33 +1,35 @@
 const std = @import("std");
 const eql = std.mem.eql;
-
 const xml = @import("xml");
-
 const vec = @import("vec");
 const Real = vec.Real;
-
 const img = @import("img.zig");
 const Color = img.Color;
 const Material = @import("Material.zig");
 const Object = @import("Object.zig").Object;
+const Sphere = @import("Object.zig").Sphere;
 const Ray = @import("Ray.zig");
 
 const World = @This();
 
 background: Background = .{ .single_color = .{} },
 material: Material = .{},
-objects: ObjectList = .{},
+objects: Objects = .{},
 
 const log = std.log.scoped(.world);
 
-pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !World {
+pub fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
+    self.objects.deinit(gpa);
+}
+
+pub fn fromXml(gpa: std.mem.Allocator, elem: *const xml.Element) !World {
     var world = @This(){};
     const options = .{
         .background = &world.background,
         .material = &world.material,
         .objects = &world.objects,
     };
-    if (try xml.parseChildren(allocator, options, elem)) |unknown| {
+    if (try xml.parseChildren(gpa, options, elem)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
         log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
         return error.UnrecognizedWorldValue;
@@ -36,42 +38,34 @@ pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !World {
 }
 
 pub fn intersect(self: *const World, r: *const Ray) ?Color {
-    var node = self.objects.list.first;
-    while (node) |n| : (node = n.next) {
-        const obj: *const ObjectNode = @alignCast(@fieldParentPtr("node", n));
-        if (obj.object.intersect(r)) return self.material.color;
+    for (self.objects.spheres.items) |s| {
+        if (s.intersect(r)) return self.material.color;
     }
     return null;
 }
 
-pub fn deinit(self: *World, allocator: std.mem.Allocator) void {
-    while (self.objects.list.popFirst()) |n| {
-        const ptr: *ObjectNode = @alignCast(@fieldParentPtr("node", n));
-        allocator.destroy(ptr);
+const Objects = struct {
+    spheres: std.ArrayList(Sphere) = .empty,
+
+    fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
+        self.spheres.deinit(gpa);
     }
-}
 
-const ObjectNode = struct {
-    object: Object,
-    node: std.DoublyLinkedList.Node = .{},
-};
+    fn add(self: *@This(), gpa: std.mem.Allocator, obj: Object) !void {
+        switch (obj) {
+            .sphere => |s| try self.spheres.append(gpa, s),
+        }
+    }
 
-const ObjectList = struct {
-    const Self = @This();
-
-    list: std.DoublyLinkedList = .{},
-
-    pub fn fromXml(allocator: std.mem.Allocator, elem: *const xml.Element) !@This() {
-        var list = std.DoublyLinkedList{};
+    pub fn fromXml(gpa: std.mem.Allocator, elem: *const xml.Element) !@This() {
+        var ret = @This(){};
         var node = elem.values.first;
         while (node) |n| : (node = n.next) {
             const c: *const xml.Element = @fieldParentPtr("node", n);
             if (!eql(u8, c.key, "object")) continue;
-            const ptr = try allocator.create(ObjectNode);
-            ptr.*.object = try .fromXml(c);
-            list.append(&ptr.node);
+            try ret.add(gpa, try .fromXml(c));
         }
-        return ObjectList{ .list = list };
+        return ret;
     }
 };
 
@@ -139,19 +133,15 @@ test "world: with object list" {
         \\    </objects>
         \\ </world>
     ;
-    var obj1 = ObjectNode{
-        .object = .{
-            .sphere = .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
-        },
+    const spheres = [_]Sphere{
+        .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
+        .{ .radius = 0.4, .center = .{ 1.0, -0.5, 8.0 } },
     };
-    var obj2 = ObjectNode{
-        .object = .{
-            .sphere = .{ .radius = 0.4, .center = .{ 1.0, -0.5, 8.0 } },
-        },
-    };
-    var objs = ObjectList{};
-    objs.list.append(&obj1.node);
-    objs.list.append(&obj2.node);
+
+    var spheres_arr = try std.ArrayList(Sphere).initCapacity(testing.allocator, 2);
+    defer spheres_arr.deinit(testing.allocator);
+    try spheres_arr.insertSlice(testing.allocator, 0, &spheres);
+
     const expected = World{
         .material = .{
             .typ = .flat,
@@ -162,32 +152,16 @@ test "world: with object list" {
                 .color = .{ .r = 255, .g = 0xff, .b = 0xf0 },
             },
         },
-        .objects = objs,
+        .objects = .{ .spheres = spheres_arr },
     };
 
     var root = try xml.parse(str, testing.allocator);
     defer root.deinit(testing.allocator);
+
     var actual = try World.fromXml(testing.allocator, &root);
     defer actual.deinit(testing.allocator);
 
     try testing.expectEqualDeep(expected.material, actual.material);
     try testing.expectEqualDeep(expected.background, actual.background);
-    try expecEqualObjectList(expected.objects, actual.objects);
-}
-
-fn expecEqualObjectList(
-    expected: ObjectList,
-    actual: ObjectList,
-) !void {
-    try testing.expectEqual(expected.list.len(), expected.list.len());
-    var e = expected.list.first;
-    var a = actual.list.first;
-    while (e != null and a != null) : ({
-        e = e.?.next;
-        a = a.?.next;
-    }) {
-        const ee: *ObjectNode = @alignCast(@fieldParentPtr("node", e.?));
-        const ae: *ObjectNode = @alignCast(@fieldParentPtr("node", a.?));
-        try testing.expectEqualDeep(ee.object, ae.object);
-    }
+    try testing.expectEqualDeep(expected.objects.spheres.items, actual.objects.spheres.items);
 }
