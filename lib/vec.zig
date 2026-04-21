@@ -13,7 +13,7 @@ pub fn normalize(
     vec: @Vector(N, T),
 ) @Vector(N, T) {
     const len_sq = @reduce(.Add, vec * vec);
-    const len = std.math.sqrt(len_sq);
+    const len = @sqrt(len_sq);
     if (len == 0.0) return .{ 0, 0, 0 };
     return vec / @as(@Vector(N, T), @splat(len));
 }
