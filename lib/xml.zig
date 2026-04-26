@@ -320,6 +320,8 @@ fn parseElement(lexer: *Lexer, allocator: std.mem.Allocator) !?Element {
     _ = lexer.next();
 
     var elem = Element{ .key = "" };
+    errdefer elem.deinit(allocator);
+
     elem.key = (lexer.expectNext(.{ .identifier = "" }) orelse
         return ParseError.ExpectedIdentifier)
         .identifier;
