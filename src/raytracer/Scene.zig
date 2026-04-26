@@ -12,10 +12,19 @@ const World = @import("World.zig");
 
 const Scene = @This();
 
+/// Represents the camera object inside the raytracer Scene.
 camera: Camera = .{ .rectangular = .{ .perspective = .{} } },
+
+/// Represents the look from the camera inside the raytracer Scene.
 look: Look = .{},
+
+/// Represents a integrator object, responsible for calculating the amount of light arriving at a given pixel.
 integrator: Integrator = .flat,
+
+/// Represents the result image metadata.
 film: Film = .{},
+
+/// Represents the digital world that the raytracer will be rendering.
 world: World = .{},
 
 const log = std.log.scoped(.scene);
@@ -76,6 +85,7 @@ pub fn render(self: *const Scene, x: u32, y: u32) [3]u8 {
     return .{ color.r, color.g, color.b };
 }
 
+/// Deinitializes allocated memory by the Scene.
 pub fn deinit(self: *Scene, allocator: Allocator) void {
     self.world.deinit(allocator);
 }
