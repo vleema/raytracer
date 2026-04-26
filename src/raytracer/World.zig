@@ -1,4 +1,7 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+const MultiArrayList = std.MultiArrayList;
 const eql = std.mem.eql;
 const xml = @import("xml");
 const vec = @import("vec");
@@ -6,67 +9,189 @@ const Real = vec.Real;
 const img = @import("img.zig");
 const Color = img.Color;
 const Material = @import("Material.zig");
-const Object = @import("Object.zig").Object;
-const Sphere = @import("Object.zig").Sphere;
+const Object = @import("Object.zig");
+const Sphere = Object.Sphere;
+const Plane = Object.Plane;
+const Triangle = Object.Triangle;
 const Ray = @import("Ray.zig");
 
 const World = @This();
 
 background: Background = .{ .single_color = .{} },
-material: Material = .{},
+materials: Materials = .{},
 objects: Objects = .{},
 
 const log = std.log.scoped(.world);
 
-pub fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
+pub fn deinit(self: *@This(), gpa: Allocator) void {
     self.objects.deinit(gpa);
+    self.materials.deinit(gpa);
 }
 
-pub fn fromXml(gpa: std.mem.Allocator, elem: *const xml.Element) !World {
+pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
     var world = @This(){};
+    errdefer world.deinit(gpa);
+    var raw_objs = Objects.Raw{};
+    defer raw_objs.list.deinit(gpa);
     const options = .{
         .background = &world.background,
-        .material = &world.material,
-        .objects = &world.objects,
+        .materials = &world.materials,
+        .objects = &raw_objs,
     };
     if (try xml.parseChildren(gpa, options, elem)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
         log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
         return error.UnrecognizedWorldValue;
     }
+    world.objects = try .init(gpa, raw_objs, &world.materials);
     return world;
 }
 
-pub fn intersect(self: *const World, r: *const Ray) ?Color {
-    for (self.objects.spheres.items) |s| {
-        if (s.intersect(r)) return self.material.color;
+pub fn intersect(self: *const World, r: Ray) ?Color {
+    const obj_slice = self.objects.list.slice();
+    const obj_tags = obj_slice.items(.tag);
+    const obj_common = obj_slice.items(.common);
+    const obj_materials = self.objects.material.items;
+
+    for (obj_tags, obj_common, obj_materials) |t, c, m| {
+        const intersects = switch (t) {
+            .sphere => self.objects.spheres.items[c.extra_idx].intersect(c, r),
+            else => false,
+        };
+        if (intersects) return self.materials.list.items[m].color;
     }
+
     return null;
 }
 
-const Objects = struct {
-    spheres: std.ArrayList(Sphere) = .empty,
+const Materials = struct {
+    list: ArrayList(Material) = .empty,
+    names: ArrayList([]const u8) = .empty,
 
-    fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
-        self.spheres.deinit(gpa);
+    var anon_idx: usize = 0;
+
+    fn init(gpa: Allocator) !@This() {
+        var this = @This(){};
+        try this.add(gpa, .{}, "default");
+        return this;
     }
 
-    fn add(self: *@This(), gpa: std.mem.Allocator, obj: Object) !void {
-        switch (obj) {
-            .sphere => |s| try self.spheres.append(gpa, s),
+    fn deinit(self: *@This(), gpa: Allocator) void {
+        for (self.names.items) |n| gpa.free(n);
+        self.names.deinit(gpa);
+        self.list.deinit(gpa);
+    }
+
+    fn add(self: *@This(), gpa: Allocator, m: Material, name: ?[]const u8) !void {
+        if (name) |n| {
+            try self.names.append(gpa, try gpa.dupe(u8, n));
+        } else {
+            // FIX: This introduces a bug where the user could type some anon name and generate a conflict.
+            try self.names.append(gpa, try std.fmt.allocPrint(gpa, "__anon__{}", .{anon_idx}));
+            anon_idx += 1;
         }
+        try self.list.append(gpa, m);
     }
 
-    pub fn fromXml(gpa: std.mem.Allocator, elem: *const xml.Element) !@This() {
-        var ret = @This(){};
+    pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !@This() {
+        var ret = try @This().init(gpa);
+        errdefer ret.deinit(gpa);
         var node = elem.values.first;
         while (node) |n| : (node = n.next) {
-            const c: *const xml.Element = @fieldParentPtr("node", n);
-            if (!eql(u8, c.key, "object")) continue;
-            try ret.add(gpa, try .fromXml(c));
+            const m: *const xml.Element = @fieldParentPtr("node", n);
+            if (!eql(u8, m.key, "material")) continue;
+            const name = if (m.queryAttribute("name", null)) |name|
+                name
+            else {
+                log.err("material name is obligatory", .{});
+                return error.ExpectedMaterialName;
+            };
+            try ret.add(gpa, try .fromXml(m), name);
         }
         return ret;
     }
+};
+
+const Objects = struct {
+    list: MultiArrayList(Object) = .empty,
+    spheres: ArrayList(Sphere) = .empty,
+    planes: ArrayList(Plane) = .empty,
+    triangles: ArrayList(Triangle) = .empty,
+    material: ArrayList(u16) = .empty,
+
+    fn init(gpa: Allocator, raw: Objects.Raw, materials: *Materials) !@This() {
+        std.debug.assert(materials.list.items.len < std.math.maxInt(u16));
+
+        var this = @This(){};
+        errdefer this.deinit(gpa);
+
+        for (raw.list.items(.material)) |r| {
+            if (r == null) {
+                try this.material.append(gpa, 0);
+                continue;
+            }
+
+            switch (r.?) {
+                .anon => |material| {
+                    try this.material.append(gpa, @intCast(materials.list.items.len));
+                    try materials.add(gpa, material, null);
+                },
+                .name => |obj_name| {
+                    for (materials.names.items, 0..) |material_name, i| {
+                        if (eql(u8, material_name, obj_name)) {
+                            try this.material.append(gpa, @intCast(i));
+                        }
+                    }
+                },
+            }
+        }
+
+        const slice = raw.list.slice();
+        const tags = slice.items(.tag);
+        const commons = slice.items(.common);
+        const inners = slice.items(.inner);
+        for (tags, commons, inners) |t, c, i| {
+            var c_ = c;
+            switch (t) {
+                .sphere => {
+                    c_.extra_idx = this.spheres.items.len;
+                    try this.spheres.append(gpa, i.sphere);
+                },
+                .plane => {
+                    c_.extra_idx = this.planes.items.len;
+                    try this.planes.append(gpa, i.plane);
+                },
+                .triangle => {
+                    c_.extra_idx = this.triangles.items.len;
+                    try this.triangles.append(gpa, i.triangle);
+                },
+            }
+            try this.list.append(gpa, .{ .tag = t, .common = c_ });
+        }
+        return this;
+    }
+
+    fn deinit(self: *@This(), gpa: Allocator) void {
+        self.list.deinit(gpa);
+        self.spheres.deinit(gpa);
+        self.material.deinit(gpa);
+    }
+
+    const Raw = struct {
+        list: MultiArrayList(Object.Raw) = .empty,
+
+        pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !@This() {
+            var this = @This(){};
+            errdefer this.list.deinit(gpa);
+            var node = elem.values.first;
+            while (node) |n| : (node = n.next) {
+                const c: *const xml.Element = @fieldParentPtr("node", n);
+                if (!eql(u8, c.key, "object")) continue;
+                try this.list.append(gpa, try .fromXml(c));
+            }
+            return this;
+        }
+    };
 };
 
 pub const Background = union(enum) {
@@ -122,37 +247,38 @@ pub const Background = union(enum) {
 
 const testing = std.testing;
 
-test "world: with object list" {
+test "world with object list" {
     const str =
         \\ <world>
         \\    <background type="single_color" color="255 0xff 0xf0" />
-        \\    <material type="flat" color="0.95 0.05 0.05" />
+        \\    <materials>
+        \\         <material name="green" type="flat" color="42 201 51"/>
+        \\    </materials>
         \\    <objects>
-        \\         <object type="sphere" radius="0.4" center="-1 0.5 5" />
-        \\         <object type="sphere" radius="0.4" center="1 -0.5 8" />
+        \\         <object type="sphere" radius="0.4" center="-1 0.5 5" material="green"/>
+        \\         <object type="sphere" radius="0.4" center="1 -0.5 8" material_type="flat" material_color="42 42 42"/>
         \\    </objects>
         \\ </world>
     ;
-    const spheres = [_]Sphere{
-        .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
-        .{ .radius = 0.4, .center = .{ 1.0, -0.5, 8.0 } },
+    const background = Background{
+        .single_color = .{ .color = .{ .r = 255, .g = 0xff, .b = 0xf0 } },
     };
 
-    var spheres_arr = try std.ArrayList(Sphere).initCapacity(testing.allocator, 2);
-    defer spheres_arr.deinit(testing.allocator);
-    try spheres_arr.insertSlice(testing.allocator, 0, &spheres);
+    const materials = [_]Material{
+        .{},
+        .{ .typ = .flat, .color = .{ .r = 42, .g = 201, .b = 51 } },
+        .{ .typ = .flat, .color = .{ .r = 42, .g = 42, .b = 42 } },
+    };
 
-    const expected = World{
-        .material = .{
-            .typ = .flat,
-            .color = .{ .r = 242, .b = 12, .g = 12 },
-        },
-        .background = .{
-            .single_color = .{
-                .color = .{ .r = 255, .g = 0xff, .b = 0xf0 },
-            },
-        },
-        .objects = .{ .spheres = spheres_arr },
+    const objects = [_]Object{
+        .{ .tag = .sphere, .common = .{ .center = .{ -1.0, 0.5, 5.0 }, .extra_idx = 0 } },
+        .{ .tag = .sphere, .common = .{ .center = .{ 1.0, -0.5, 8.0 }, .extra_idx = 1 } },
+    };
+    const material = [_]u16{ 1, 2 };
+
+    const spheres = [_]Sphere{
+        .{ .radius = 0.4 },
+        .{ .radius = 0.4 },
     };
 
     var root = try xml.parse(str, testing.allocator);
@@ -161,7 +287,14 @@ test "world: with object list" {
     var actual = try World.fromXml(testing.allocator, &root);
     defer actual.deinit(testing.allocator);
 
-    try testing.expectEqualDeep(expected.material, actual.material);
-    try testing.expectEqualDeep(expected.background, actual.background);
-    try testing.expectEqualDeep(expected.objects.spheres.items, actual.objects.spheres.items);
+    try testing.expectEqualDeep(background, actual.background);
+    try testing.expectEqualDeep(&materials, actual.materials.list.items);
+
+    try testing.expectEqual(objects.len, actual.objects.list.len);
+    for (0..actual.objects.list.len) |i| {
+        try testing.expectEqualDeep(objects[i], actual.objects.list.get(i));
+    }
+
+    try testing.expectEqualDeep(&material, actual.objects.material.items);
+    try testing.expectEqualDeep(&spheres, actual.objects.spheres.items);
 }

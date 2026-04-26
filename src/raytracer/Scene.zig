@@ -1,8 +1,9 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const Io = std.Io;
 const xml = @import("xml");
 const png = @import("png");
 const ppm = @import("ppm");
-
 const Camera = @import("Camera.zig").Camera;
 const Film = @import("Film.zig");
 const Integrator = @import("Integrator.zig").Integrator;
@@ -20,19 +21,19 @@ world: World = .{},
 const log = std.log.scoped(.scene);
 
 /// Creates a scene from a xml file.
-pub fn fromXmlFile(allocator: std.mem.Allocator, io: std.Io, file: std.Io.File) !Scene {
+pub fn fromXmlFile(gpa: Allocator, io: Io, file: Io.File) !Scene {
     const md = try file.stat(io);
     const mmap = try std.posix.mmap(null, md.size, .{ .READ = true }, .{ .TYPE = .PRIVATE }, file.handle, 0);
     defer std.posix.munmap(mmap);
 
-    var root = try xml.parse(mmap, allocator);
-    defer root.deinit(allocator);
+    var root = try xml.parse(mmap, gpa);
+    defer root.deinit(gpa);
 
-    return fromXml(allocator, &root);
+    return fromXml(gpa, &root);
 }
 
 /// Writes the scene into a file under `dir`.
-pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, io: std.Io, dir: std.Io.Dir) !void {
+pub fn intoImgFile(self: *const Scene, gpa: Allocator, io: Io, dir: Io.Dir) !void {
     var out = try dir.createFile(io, self.film.filename, .{});
     defer out.close(io);
 
@@ -43,8 +44,9 @@ pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, io: std.Io,
 }
 
 /// Creates a scene from a `xml.Element`.
-pub fn fromXml(allocator: std.mem.Allocator, root: *const xml.Element) !@This() {
+pub fn fromXml(gpa: Allocator, root: *const xml.Element) !@This() {
     var scene = @This(){};
+    errdefer scene.deinit(gpa);
     const options = .{
         .camera = &scene.camera,
         .lookat = &scene.look,
@@ -52,7 +54,7 @@ pub fn fromXml(allocator: std.mem.Allocator, root: *const xml.Element) !@This() 
         .film = &scene.film,
         .world = &scene.world,
     };
-    if (try xml.parseChildren(allocator, options, root)) |unknown| {
+    if (try xml.parseChildren(gpa, options, root)) |unknown| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
         log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
         return error.UnrecognizedOption;
@@ -63,8 +65,7 @@ pub fn fromXml(allocator: std.mem.Allocator, root: *const xml.Element) !@This() 
 /// Returns the array form of color of a given pixel in a image file.
 pub fn render(self: *const Scene, x: u32, y: u32) [3]u8 {
     const ray = self.camera.generateRay(x, y, self.look.normalFrame(), self.film);
-    // log.debug("pixel: {} ray: {}", .{ .{ x, y }, ray });
-    const color = if (self.world.intersect(&ray)) |c|
+    const color = if (self.world.intersect(ray)) |c|
         c
     else
         self.world.background.ptColor(
@@ -75,7 +76,7 @@ pub fn render(self: *const Scene, x: u32, y: u32) [3]u8 {
     return .{ color.r, color.g, color.b };
 }
 
-pub fn deinit(self: *Scene, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *Scene, allocator: Allocator) void {
     self.world.deinit(allocator);
 }
 
@@ -116,6 +117,7 @@ test "from xml" {
             .img_type = .png,
         },
         .world = .{
+            .materials = .{ .list = .empty },
             .background = .{
                 .single_color = .{
                     .color = .{
@@ -129,7 +131,9 @@ test "from xml" {
     };
     var root = try xml.parse(str, std.testing.allocator);
     defer root.deinit(std.testing.allocator);
+
     var actual = try Scene.fromXml(std.testing.allocator, &root);
     defer actual.deinit(std.testing.allocator);
+
     try std.testing.expectEqualDeep(expected, actual);
 }

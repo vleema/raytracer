@@ -1,5 +1,2 @@
-const vec = @import("vec");
-const Real = vec.Real;
-
-origin: Real(3),
-direction: Real(3),
+origin: [3]f64,
+direction: [3]f64,
