@@ -1,9 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
-const xml = @import("xml");
+
 const png = @import("png");
 const ppm = @import("ppm");
+const xml = @import("xml");
+
+const img = @import("img.zig");
+const Color = img.Color;
 const Camera = @import("Camera.zig").Camera;
 const Film = @import("Film.zig");
 const Integrator = @import("Integrator.zig").Integrator;
@@ -21,7 +25,7 @@ look: Look = .{},
 /// Represents a integrator object, responsible for calculating the amount of light arriving at a given pixel.
 integrator: Integrator = .flat,
 
-/// Represents the result image metadata.
+/// Represents the result image metadata and buffer.
 film: Film = .{},
 
 /// Represents the digital world that the raytracer will be rendering.
@@ -39,17 +43,6 @@ pub fn fromXmlFile(gpa: Allocator, io: Io, file: Io.File) !Scene {
     defer root.deinit(gpa);
 
     return fromXml(gpa, &root);
-}
-
-/// Writes the scene into a file under `dir`.
-pub fn intoImgFile(self: *const Scene, gpa: Allocator, io: Io, dir: Io.Dir) !void {
-    var out = try dir.createFile(io, self.film.filename, .{});
-    defer out.close(io);
-
-    switch (self.film.img_type) {
-        .png => try png.writeTrueColor8(self, gpa, io, out, self.film.width, self.film.height),
-        .ppm => try ppm.writeP6(self, io, out, self.film.width, self.film.height),
-    }
 }
 
 /// Creates a scene from a `xml.Element`.
@@ -71,18 +64,26 @@ pub fn fromXml(gpa: Allocator, root: *const xml.Element) !@This() {
     return scene;
 }
 
-/// Returns the array form of color of a given pixel in a image file.
-pub fn render(self: *const Scene, x: u32, y: u32) [3]u8 {
-    const ray = self.camera.generateRay(x, y, self.look.normalFrame(), self.film);
-    const color = if (self.world.intersect(&ray)) |c|
-        c
-    else
-        self.world.background.ptColor(
-            self.film.width,
-            self.film.height,
-            .{ @floatFromInt(x), @floatFromInt(y) },
-        );
-    return .{ color.r, color.g, color.b };
+/// Renders the described scene to the specified file.
+pub fn renderImg(self: *Scene, gpa: Allocator, io: Io, dir: Io.Dir) !void {
+    var allocating_writer = Io.Writer.Allocating.init(gpa);
+    defer allocating_writer.deinit();
+
+    try allocating_writer.ensureTotalCapacity(self.film.width * self.film.height * @sizeOf(Color));
+    const writer = &allocating_writer.writer;
+
+    try self.integrator.render(
+        writer,
+        &self.world,
+        &self.camera,
+        &self.look.normalFrame(),
+        self.film.width,
+        self.film.height,
+    );
+
+    const buf = allocating_writer.written();
+    self.film.buf = std.mem.bytesAsSlice(Color, buf);
+    return self.film.intoImgFile(gpa, io, dir);
 }
 
 /// Deinitializes allocated memory by the Scene.

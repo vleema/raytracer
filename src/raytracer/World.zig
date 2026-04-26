@@ -45,7 +45,7 @@ pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
     return world;
 }
 
-pub fn intersect(self: *const World, r: *const Ray) ?Color {
+pub fn objHit(self: *const World, r: *const Ray) ?Color {
     const obj_slice = self.objects.list.slice();
     const obj_tags = obj_slice.items(.tag);
     const obj_common = obj_slice.items(.common);
@@ -53,7 +53,7 @@ pub fn intersect(self: *const World, r: *const Ray) ?Color {
 
     for (obj_tags, obj_common, obj_materials) |t, c, m| {
         const intersects = switch (t) {
-            .sphere => self.objects.spheres.items[c.extra_idx].intersect(r),
+            .sphere => self.objects.spheres.items[c.extra_idx].hit(r),
         };
         if (intersects) return self.materials.list.items[m].color;
     }
@@ -218,7 +218,7 @@ pub const Background = union(enum) {
         return error.InvalidBackgroundType;
     }
 
-    pub fn ptColor(self: *const @This(), width: u32, height: u32, pt: Real(2)) Color {
+    pub fn ptColor(self: *const @This(), width: u32, height: u32, pt: [2]f64) Color {
         return switch (self.*) {
             .single_color => |b| b.color,
             .four_colors => |b| img.bilerp(

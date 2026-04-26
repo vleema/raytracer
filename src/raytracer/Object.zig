@@ -1,5 +1,7 @@
 const std = @import("std");
 const eql = std.mem.eql;
+const ArrayList = std.ArrayList;
+const MultiArrayList = std.MultiArrayList;
 const xml = @import("xml");
 const vec = @import("vec");
 const Real = vec.Real;
@@ -31,7 +33,7 @@ pub const Sphere = struct {
     center: [3]f64 = .{ -1.0, 0.5, 5.0 },
     radius: f64 = 0.4,
 
-    pub fn intersect(self: *const @This(), r: *const Ray) bool {
+    pub fn hit(self: *const @This(), r: *const Ray) bool {
         const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
         const a = vec.dot(3, f64, r.direction, r.direction);
         const b = -2.0 * vec.dot(3, f64, r.direction, oc);

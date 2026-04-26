@@ -1,9 +1,9 @@
 const std = @import("std");
 
-/// Writes to PPM P6 file using the method `render` from a `renderer` to define a color of a position.
+/// Writes to PPM P6 file using the method `color` from a `renderer` to define a color of a position.
 ///
-/// The `renderer` should have a method `render(self, x: u32, y: u32) [3]u8`.
-/// The `render` function will be used to compute the color of each iterated pixel.
+/// The `renderer` should have a method `color(self, x: u32, y: u32) [3]u8`.
+/// The `color` function will be used to compute the color of each iterated pixel.
 pub fn writeP6(
     renderer: anytype,
     io: std.Io,
@@ -21,7 +21,7 @@ pub fn writeP6(
 
     for (0..height) |y| {
         for (0..width) |x| {
-            const color: [3]u8 = renderer.render(@intCast(x), @intCast(y));
+            const color: [3]u8 = renderer.color(@intCast(x), @intCast(y));
             try w.writeAll(&color);
         }
     }

@@ -4,8 +4,8 @@ const Endian = std.builtin.Endian;
 
 /// Writes a true color PNG with 8 as bit depth using the method `render` from a `renderer`.
 ///
-/// The `renderer` should have a method `render(self, x: u32, y: u32) [3]u8`.
-/// The `render` function will be used to compute the color of each iterated pixel.
+/// The `renderer` should have a method `color(self, x: u32, y: u32) [3]u8`.
+/// The `color` function will be used to compute the color of each iterated pixel.
 pub fn writeTrueColor8(
     renderer: anytype,
     allocator: std.mem.Allocator,
@@ -58,7 +58,7 @@ pub fn writeTrueColor8(
 
     for (0..height) |y| {
         for (0..width) |x| {
-            const color: [3]u8 = renderer.render(@intCast(x), @intCast(y));
+            const color: [3]u8 = renderer.color(@intCast(x), @intCast(y));
             raw_row[x * 3 ..][0..3].* = color;
         }
 

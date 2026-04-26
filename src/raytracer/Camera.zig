@@ -20,11 +20,12 @@ pub const Camera = union(enum) {
         self: *const @This(),
         img_x: u32,
         img_y: u32,
-        frame: Frame,
-        film: Film,
+        width: u32,
+        height: u32,
+        frame: *const Frame,
     ) Ray {
-        const w: f64 = @floatFromInt(film.width);
-        const h: f64 = @floatFromInt(film.height);
+        const w: f64 = @floatFromInt(width);
+        const h: f64 = @floatFromInt(height);
         const ix: f64 = @floatFromInt(img_x);
         const iy: f64 = @floatFromInt(img_y);
 
@@ -87,7 +88,7 @@ const Rectangular = union(enum) {
         img_y: f64,
         width: f64,
         height: f64,
-        frame: Frame,
+        frame: *const Frame,
     ) Ray {
         const aspect_ratio = width / height;
         const sw = self.screenWindow(aspect_ratio);
@@ -132,7 +133,7 @@ const Spherical = enum {
         img_y: f64,
         width: f64,
         height: f64,
-        frame: Frame,
+        frame: *const Frame,
     ) Ray {
         return switch (self.*) {
             .equirectangular => blk: {
@@ -182,7 +183,7 @@ test "orthographic: top-left pixel maps to screen window corner" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
-    const ray = cam.generateRay(0, 0, axis_frame, film);
+    const ray = cam.generateRay(0, 0, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ -2, 2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
 
@@ -193,28 +194,28 @@ test "orthographic: center pixel maps to screen window center" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
-    const ray = cam.generateRay(2, 2, axis_frame, film);
+    const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
 
 test "orthographic: direction is always frame direction" {
     const cam: Camera = .{ .rectangular = .{ .orthographic = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    const ray = cam.generateRay(3, 1, axis_frame, film);
+    const ray = cam.generateRay(3, 1, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
 }
 
 test "perspective: origin is always frame origin" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    const ray = cam.generateRay(1, 3, axis_frame, film);
+    const ray = cam.generateRay(1, 3, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ray.origin);
 }
 
 test "perspective: center pixel direction equals frame direction" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    const ray = cam.generateRay(2, 2, axis_frame, film);
+    const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
 }
 
@@ -222,14 +223,14 @@ test "spherical: origin is always frame origin" {
     const film = Film{ .width = 4, .height = 4 };
     const eq = Camera{ .spherical = .equirectangular };
     const ea = Camera{ .spherical = .equal_area };
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), eq.generateRay(2, 1, axis_frame, film).origin);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ea.generateRay(2, 1, axis_frame, film).origin);
+    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), eq.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
+    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ea.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
 }
 
 test "equirectangular: top row maps to north pole" {
     const cam: Camera = .{ .spherical = .equirectangular };
     const film = Film{ .width = 4, .height = 4 };
     // theta = pi * 0/4 = 0 -> sin=0, cos=1 -> {0, 0, 1} for any phi.
-    const ray = cam.generateRay(2, 0, axis_frame, film);
+    const ray = cam.generateRay(2, 0, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
 }
