@@ -33,20 +33,36 @@ pub const Sphere = struct {
     center: [3]f64 = .{ -1.0, 0.5, 5.0 },
     radius: f64 = 0.4,
 
-    pub fn hit(self: *const @This(), r: *const Ray) bool {
+    pub fn hit(self: *const @This(), r: *const Ray, tmin: f64, tmax: f64) ?Hit {
         const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
         const a = vec.dot(3, f64, r.direction, r.direction);
-        const b = -2.0 * vec.dot(3, f64, r.direction, oc);
+        const h = vec.dot(3, f64, r.direction, oc);
         const c = vec.dot(3, f64, oc, oc) - self.radius * self.radius;
-        const discriminant = b * b - 4 * a * c;
-        return discriminant >= 0;
+        const discriminant = h * h - a * c;
+        if (discriminant < 0) return null;
+
+        const sqrtd = @sqrt(discriminant);
+        var t = (h - sqrtd) / a;
+        if (t <= tmin or tmax <= t) {
+            t += (h + sqrtd) / a;
+            if (t <= tmin or tmax <= t) return null;
+        }
+        const normal = (@as(Real(3), r.at(t)) - @as(Real(3), self.center)) / @as(Real(3), @splat(self.radius));
+
+        return .{ .t = t, .normal = normal };
     }
+};
+
+pub const Hit = struct {
+    t: f64,
+    normal: [3]f64,
 };
 
 pub const Raw = struct {
     inner: union(Tag) {
         sphere: Sphere,
     } = .{ .sphere = .{} },
+
     material: ?union(enum) {
         anon: Material,
         name: []const u8,

@@ -53,11 +53,15 @@ pub const Flat = struct {
         for (0..height) |y| {
             for (0..width) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);
-                const color = world.objHit(&ray) orelse world.background.ptColor(
-                    width,
-                    height,
-                    .{ @floatFromInt(x), @floatFromInt(y) },
-                );
+                const color = if (world.objHit(&ray)) |v|
+                    v.material.color
+                else
+                    world.background.ptColor(
+                        width,
+                        height,
+                        .{ @floatFromInt(x), @floatFromInt(y) },
+                    );
+
                 try writer.writeAll(std.mem.asBytes(&color));
             }
         }

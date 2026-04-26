@@ -3,9 +3,12 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
 const eql = std.mem.eql;
-const xml = @import("xml");
+const testing = std.testing;
+
 const vec = @import("vec");
 const Real = vec.Real;
+const xml = @import("xml");
+
 const img = @import("img.zig");
 const Color = img.Color;
 const Material = @import("Material.zig");
@@ -45,18 +48,30 @@ pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
     return world;
 }
 
-pub fn objHit(self: *const World, r: *const Ray) ?Color {
-    const obj_slice = self.objects.list.slice();
-    const obj_tags = obj_slice.items(.tag);
-    const obj_common = obj_slice.items(.common);
-    const obj_materials = self.objects.material.items;
+pub fn objHit(self: *const World, r: *const Ray) ?struct { hit: Object.Hit, material: Material } {
+    const tmin = 0;
+    var tmax = std.math.inf(f64);
+    var closest_hit: ?Object.Hit = null;
+    var material: ?Material = null;
 
-    for (obj_tags, obj_common, obj_materials) |t, c, m| {
-        const intersects = switch (t) {
-            .sphere => self.objects.spheres.items[c.extra_idx].hit(r),
+    const slice = self.objects.list.slice();
+    const tags = slice.items(.tag);
+    const commons = slice.items(.common);
+    for (tags, commons, self.objects.materials.items) |t, c, m| {
+        const hit = switch (t) {
+            .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
         };
-        if (intersects) return self.materials.list.items[m].color;
+        if (hit) |h| {
+            closest_hit = h;
+            tmax = h.t;
+            material = self.materials.list.items[m];
+        }
     }
+
+    if (closest_hit != null and material != null) return .{
+        .hit = closest_hit.?,
+        .material = material.?,
+    };
 
     return null;
 }
@@ -111,8 +126,9 @@ const Materials = struct {
 
 const Objects = struct {
     list: MultiArrayList(Object) = .empty,
+    materials: ArrayList(u16) = .empty,
+
     spheres: ArrayList(Sphere) = .empty,
-    material: ArrayList(u16) = .empty,
 
     fn init(gpa: Allocator, raw: Objects.Raw, materials: *Materials) !@This() {
         std.debug.assert(materials.list.items.len < std.math.maxInt(u16));
@@ -122,19 +138,19 @@ const Objects = struct {
 
         for (raw.list.items(.material)) |r| {
             if (r == null) {
-                try this.material.append(gpa, 0);
+                try this.materials.append(gpa, 0);
                 continue;
             }
 
             switch (r.?) {
                 .anon => |material| {
-                    try this.material.append(gpa, @intCast(materials.list.items.len));
+                    try this.materials.append(gpa, @intCast(materials.list.items.len));
                     try materials.add(gpa, material, null);
                 },
                 .name => |obj_name| {
                     for (materials.names.items, 0..) |material_name, i| {
                         if (eql(u8, material_name, obj_name)) {
-                            try this.material.append(gpa, @intCast(i));
+                            try this.materials.append(gpa, @intCast(i));
                         }
                     }
                 },
@@ -161,7 +177,7 @@ const Objects = struct {
     fn deinit(self: *@This(), gpa: Allocator) void {
         self.list.deinit(gpa);
         self.spheres.deinit(gpa);
-        self.material.deinit(gpa);
+        self.materials.deinit(gpa);
     }
 
     const Raw = struct {
@@ -232,8 +248,6 @@ pub const Background = union(enum) {
     }
 };
 
-const testing = std.testing;
-
 test "world with object list" {
     const str =
         \\ <world>
@@ -282,6 +296,6 @@ test "world with object list" {
         try testing.expectEqualDeep(objects[i], actual.objects.list.get(i));
     }
 
-    try testing.expectEqualDeep(&material, actual.objects.material.items);
+    try testing.expectEqualDeep(&material, actual.objects.materials.items);
     try testing.expectEqualDeep(&spheres, actual.objects.spheres.items);
 }
