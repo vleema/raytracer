@@ -15,18 +15,10 @@ common: Common,
 
 pub const Tag = enum {
     sphere,
-    plane,
-    triangle,
 
     pub fn fromStr(str: []const u8) !@This() {
-        if (eql(u8, str, "sphere"))
-            return .sphere
-        else if (eql(u8, str, "plane"))
-            return .plane
-        else if (eql(u8, str, "triangle"))
-            return .triangle;
-
-        log.err("expected one of ['sphere', 'plane', 'triangle'], found '{s}'", .{str});
+        if (eql(u8, str, "sphere")) return .sphere;
+        log.err("expected one of ['sphere'], found '{s}'", .{str});
         return error.InvalidObjectTag;
     }
 };
@@ -39,7 +31,7 @@ pub const Sphere = struct {
     center: [3]f64 = .{ -1.0, 0.5, 5.0 },
     radius: f64 = 0.4,
 
-    pub fn intersect(self: *const @This(), r: Ray) bool {
+    pub fn intersect(self: *const @This(), r: *const Ray) bool {
         const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
         const a = vec.dot(3, f64, r.direction, r.direction);
         const b = -2.0 * vec.dot(3, f64, r.direction, oc);
@@ -49,19 +41,9 @@ pub const Sphere = struct {
     }
 };
 
-pub const Plane = struct {};
-
-pub const Triangle = struct {
-    height: f32 = 0.5,
-    base_x: f32 = 0.2,
-    base_y: f32 = 0.2,
-};
-
 pub const Raw = struct {
     inner: union(Tag) {
         sphere: Sphere,
-        plane: Plane,
-        triangle: Triangle,
     } = .{ .sphere = .{} },
     material: ?union(enum) {
         anon: Material,
@@ -95,10 +77,6 @@ pub const Raw = struct {
                         .center = try xml.parseFloatArray(f64, 3, center),
                     },
                 };
-            },
-            else => |v| {
-                log.err("unsupported object type '{s}'", .{@tagName(v)});
-                return error.Unsupported;
             },
         }
 

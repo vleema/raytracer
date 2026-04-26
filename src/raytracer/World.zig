@@ -11,8 +11,6 @@ const Color = img.Color;
 const Material = @import("Material.zig");
 const Object = @import("Object.zig");
 const Sphere = Object.Sphere;
-const Plane = Object.Plane;
-const Triangle = Object.Triangle;
 const Ray = @import("Ray.zig");
 
 const World = @This();
@@ -47,7 +45,7 @@ pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
     return world;
 }
 
-pub fn intersect(self: *const World, r: Ray) ?Color {
+pub fn intersect(self: *const World, r: *const Ray) ?Color {
     const obj_slice = self.objects.list.slice();
     const obj_tags = obj_slice.items(.tag);
     const obj_common = obj_slice.items(.common);
@@ -56,7 +54,6 @@ pub fn intersect(self: *const World, r: Ray) ?Color {
     for (obj_tags, obj_common, obj_materials) |t, c, m| {
         const intersects = switch (t) {
             .sphere => self.objects.spheres.items[c.extra_idx].intersect(r),
-            else => false,
         };
         if (intersects) return self.materials.list.items[m].color;
     }
@@ -115,8 +112,6 @@ const Materials = struct {
 const Objects = struct {
     list: MultiArrayList(Object) = .empty,
     spheres: ArrayList(Sphere) = .empty,
-    planes: ArrayList(Plane) = .empty,
-    triangles: ArrayList(Triangle) = .empty,
     material: ArrayList(u16) = .empty,
 
     fn init(gpa: Allocator, raw: Objects.Raw, materials: *Materials) !@This() {
@@ -152,14 +147,6 @@ const Objects = struct {
                 .sphere => {
                     idx = this.spheres.items.len;
                     try this.spheres.append(gpa, i.sphere);
-                },
-                .plane => {
-                    idx = this.planes.items.len;
-                    try this.planes.append(gpa, i.plane);
-                },
-                .triangle => {
-                    idx = this.triangles.items.len;
-                    try this.triangles.append(gpa, i.triangle);
                 },
             }
             try this.list.append(gpa, .{
