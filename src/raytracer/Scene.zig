@@ -37,8 +37,8 @@ pub fn intoImgFile(self: *const Scene, allocator: std.mem.Allocator, io: std.Io,
     defer out.close(io);
 
     switch (self.film.img_type) {
-        .png => try png.writeTrueColor8(allocator, io, out, self.film.width, self.film.height, self),
-        .ppm => try ppm.writeP6(io, out, self.film.width, self.film.height, self),
+        .png => try png.writeTrueColor8(self, gpa, io, out, self.film.width, self.film.height),
+        .ppm => try ppm.writeP6(self, io, out, self.film.width, self.film.height),
     }
 }
 

@@ -1,5 +1,3 @@
-// TODO: Possibly use pure zig implementation of zlib.
-
 const std = @import("std");
 const flate = std.compress.flate;
 const Endian = std.builtin.Endian;
@@ -9,12 +7,12 @@ const Endian = std.builtin.Endian;
 /// The `renderer` should have a method `render(self, x: u32, y: u32) [3]u8`.
 /// The `render` function will be used to compute the color of each iterated pixel.
 pub fn writeTrueColor8(
+    renderer: anytype,
     allocator: std.mem.Allocator,
     io: std.Io,
     file: std.Io.File,
     width: u32,
     height: u32,
-    renderer: anytype,
 ) !void {
     var file_writer_buf: [1 << 16]u8 = undefined;
     var file_writer = file.writer(io, &file_writer_buf);
