@@ -1,11 +1,8 @@
-const xml = @import("xml");
-
 const std = @import("std");
 const math = std.math;
-
+const xml = @import("xml");
 const vec = @import("vec");
 const Real = vec.Real;
-
 const Frame = @import("Look.zig").Frame;
 const Film = @import("Film.zig");
 const Ray = @import("Ray.zig");
