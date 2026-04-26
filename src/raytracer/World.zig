@@ -55,7 +55,7 @@ pub fn intersect(self: *const World, r: Ray) ?Color {
 
     for (obj_tags, obj_common, obj_materials) |t, c, m| {
         const intersects = switch (t) {
-            .sphere => self.objects.spheres.items[c.extra_idx].intersect(c, r),
+            .sphere => self.objects.spheres.items[c.extra_idx].intersect(r),
             else => false,
         };
         if (intersects) return self.materials.list.items[m].color;
@@ -146,28 +146,28 @@ const Objects = struct {
             }
         }
 
-        const slice = raw.list.slice();
-        const tags = slice.items(.tag);
-        const commons = slice.items(.common);
-        const inners = slice.items(.inner);
-        for (tags, commons, inners) |t, c, i| {
-            var c_ = c;
-            switch (t) {
+        for (raw.list.items(.inner)) |i| {
+            var idx: usize = undefined;
+            switch (i) {
                 .sphere => {
-                    c_.extra_idx = this.spheres.items.len;
+                    idx = this.spheres.items.len;
                     try this.spheres.append(gpa, i.sphere);
                 },
                 .plane => {
-                    c_.extra_idx = this.planes.items.len;
+                    idx = this.planes.items.len;
                     try this.planes.append(gpa, i.plane);
                 },
                 .triangle => {
-                    c_.extra_idx = this.triangles.items.len;
+                    idx = this.triangles.items.len;
                     try this.triangles.append(gpa, i.triangle);
                 },
             }
-            try this.list.append(gpa, .{ .tag = t, .common = c_ });
+            try this.list.append(gpa, .{
+                .tag = @as(Object.Tag, i),
+                .common = .{ .extra_idx = idx },
+            });
         }
+
         return this;
     }
 
@@ -271,14 +271,14 @@ test "world with object list" {
     };
 
     const objects = [_]Object{
-        .{ .tag = .sphere, .common = .{ .center = .{ -1.0, 0.5, 5.0 }, .extra_idx = 0 } },
-        .{ .tag = .sphere, .common = .{ .center = .{ 1.0, -0.5, 8.0 }, .extra_idx = 1 } },
+        .{ .tag = .sphere, .common = .{ .extra_idx = 0 } },
+        .{ .tag = .sphere, .common = .{ .extra_idx = 1 } },
     };
     const material = [_]u16{ 1, 2 };
 
     const spheres = [_]Sphere{
-        .{ .radius = 0.4 },
-        .{ .radius = 0.4 },
+        .{ .radius = 0.4, .center = .{ -1.0, 0.5, 5.0 } },
+        .{ .radius = 0.4, .center = .{ 1.0, -0.5, 8.0 } },
     };
 
     var root = try xml.parse(str, testing.allocator);

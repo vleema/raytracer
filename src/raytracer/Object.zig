@@ -32,15 +32,15 @@ pub const Tag = enum {
 };
 
 pub const Common = struct {
-    center: [3]f64 = .{ -1.0, 0.5, 5.0 },
     extra_idx: usize = 0,
 };
 
 pub const Sphere = struct {
+    center: [3]f64 = .{ -1.0, 0.5, 5.0 },
     radius: f64 = 0.4,
 
-    pub fn intersect(self: *const @This(), common: Common, r: Ray) bool {
-        const oc = @as(Real(3), common.center) - @as(Real(3), r.origin);
+    pub fn intersect(self: *const @This(), r: Ray) bool {
+        const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
         const a = vec.dot(3, f64, r.direction, r.direction);
         const b = -2.0 * vec.dot(3, f64, r.direction, oc);
         const c = vec.dot(3, f64, oc, oc) - self.radius * self.radius;
@@ -51,12 +51,14 @@ pub const Sphere = struct {
 
 pub const Plane = struct {};
 
-pub const Triangle = struct {};
+pub const Triangle = struct {
+    height: f32 = 0.5,
+    base_x: f32 = 0.2,
+    base_y: f32 = 0.2,
+};
 
 pub const Raw = struct {
-    tag: Tag = .sphere,
-    common: Common = .{},
-    inner: union {
+    inner: union(Tag) {
         sphere: Sphere,
         plane: Plane,
         triangle: Triangle,
@@ -79,25 +81,26 @@ pub const Raw = struct {
 
         switch (tag) {
             .sphere => {
-                if (elem.queryAttribute("radius", null)) |r| {
-                    this.inner = .{ .sphere = .{ .radius = try std.fmt.parseFloat(f64, r) } };
-                } else {
+                const radius = elem.queryAttribute("radius", null) orelse {
                     log.err("expected sphere radius in object definition", .{});
                     return error.ExpectedSphereRadius;
-                }
+                };
+                const center = elem.queryAttribute("center", null) orelse {
+                    log.err("expected sphere center in object definition", .{});
+                    return error.ExpectedSphereCenter;
+                };
+                this.inner = .{
+                    .sphere = .{
+                        .radius = try std.fmt.parseFloat(f64, radius),
+                        .center = try xml.parseFloatArray(f64, 3, center),
+                    },
+                };
             },
             else => |v| {
                 log.err("unsupported object type '{s}'", .{@tagName(v)});
                 return error.Unsupported;
             },
         }
-
-        const center = elem.queryAttribute("center", null) orelse {
-            log.err("expected object center", .{});
-            return error.ExpectedObjectCenter;
-        };
-
-        this.common.center = try xml.parseFloatArray(f64, 3, center);
 
         if (elem.queryAttribute("material_type", null)) |t| {
             this.material =
@@ -131,12 +134,10 @@ test "sphere with anon material" {
     defer root.deinit(testing.allocator);
 
     const expected = Raw{
-        .common = .{
-            .center = .{ -1, -1.5, 3.5 },
-        },
         .inner = .{
             .sphere = .{
                 .radius = 0.4,
+                .center = .{ -1, -1.5, 3.5 },
             },
         },
         .material = .{
@@ -147,8 +148,7 @@ test "sphere with anon material" {
         },
     };
     const actual = try Raw.fromXml(root.firstChildElement("object").?);
-    try testing.expectEqualDeep(expected.common, actual.common);
-    try testing.expectEqualDeep(expected.inner.sphere, actual.inner.sphere);
+    try testing.expectEqualDeep(expected.inner, actual.inner);
     try testing.expectEqualDeep(expected.material, actual.material);
 }
 
@@ -162,19 +162,15 @@ test "sphere with nammed material" {
     defer root.deinit(testing.allocator);
 
     const expected = Object.Raw{
-        .common = .{
-            .center = .{ -1.0, -1.5, 3.5 },
-        },
         .inner = .{
             .sphere = .{
                 .radius = 0.4,
+                .center = .{ -1.0, -1.5, 3.5 },
             },
         },
         .material = .{ .name = "green" },
     };
     const actual = try Object.Raw.fromXml(root.firstChildElement("object").?);
-    try testing.expectEqualDeep(expected.common, actual.common);
-    try testing.expectEqualDeep(expected.tag, actual.tag);
-    try testing.expectEqualDeep(expected.inner.sphere, actual.inner.sphere);
+    try testing.expectEqualDeep(expected.inner, actual.inner);
     try testing.expectEqualDeep(expected.material, actual.material);
 }
