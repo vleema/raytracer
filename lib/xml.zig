@@ -225,12 +225,12 @@ pub fn parseElemValues(
     while (node) |n| : (node = n.next) {
         const value: *const Element = @fieldParentPtr("node", n);
         var matched = false;
+        if (parsed.contains(value.key)) {
+            std.log.err("duplicate key '{s}' found", .{value.key});
+            return error.DuplicateKey;
+        }
 
         inline for (fields) |f| {
-            if (parsed.contains(f.name)) {
-                std.log.err("duplicate key '{s}' found", .{f.name});
-                return error.DuplicateKey;
-            }
             if (std.mem.eql(u8, f.name, value.key)) {
                 const ptr = @field(options, f.name);
                 const T = @TypeOf(ptr.*);
