@@ -17,7 +17,7 @@ pub const Integrator = union(enum) {
 
     pub fn render(
         self: *const Integrator,
-        writer: *Io.Writer,
+        buf: []Color,
         world: *const World,
         camera: *const Camera,
         frame: *const Frame,
@@ -25,7 +25,7 @@ pub const Integrator = union(enum) {
         height: u32,
     ) !void {
         return switch (self.*) {
-            .flat => Flat.render(writer, world, camera, frame, width, height),
+            .flat => Flat.render(buf, world, camera, frame, width, height),
         };
     }
 
@@ -43,7 +43,7 @@ pub const Integrator = union(enum) {
 
 pub const Flat = struct {
     pub fn render(
-        writer: *Io.Writer,
+        buf: []Color,
         world: *const World,
         camera: *const Camera,
         frame: *const Frame,
@@ -62,9 +62,8 @@ pub const Flat = struct {
                         .{ @floatFromInt(x), @floatFromInt(y) },
                     );
 
-                try writer.writeAll(std.mem.asBytes(&color));
+                buf[x + y * width] = color;
             }
         }
-        try writer.flush();
     }
 };

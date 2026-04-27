@@ -2,12 +2,15 @@ const std = @import("std");
 const eql = std.mem.eql;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
-const xml = @import("xml");
+const testing = std.testing;
+
 const vec = @import("vec");
 const Real = vec.Real;
+const xml = @import("xml");
 
-const Ray = @import("Ray.zig");
 const Material = @import("Material.zig");
+const Ray = @import("Ray.zig");
+
 const Object = @This();
 
 const log = std.log.scoped(.object);
@@ -117,8 +120,6 @@ pub const Raw = struct {
         return this;
     }
 };
-
-const testing = std.testing;
 
 test "sphere with anon material" {
     const str =

@@ -27,7 +27,8 @@ filename: []const u8 = "out.png",
 /// The type of image that will be generated.
 img_type: enum { ppm, png } = .png,
 
-/// The color buffer of the film, this is used by the Scene, during the rendering process.
+/// The color buffer of the film, this is filled by the `Scene` in the `render` method
+/// and it's used when converting the Film to a file.
 buf: []const Color = &.{},
 
 const log = std.log.scoped(.film);
@@ -79,7 +80,15 @@ pub fn fromXml(elem: *const xml.Element) !Film {
 }
 
 /// Writes the contents of the color buffer to a image file.
-pub fn intoImgFile(self: *const Film, gpa: Allocator, io: Io, dir: Io.Dir) !void {
+pub fn intoImg(
+    self: *Film,
+    gpa: Allocator,
+    io: Io,
+    dir: Io.Dir,
+    buf: []const Color,
+) !void {
+    self.buf = buf;
+
     var out = try dir.createFile(io, self.filename, .{});
     defer out.close(io);
 

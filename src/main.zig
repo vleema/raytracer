@@ -10,8 +10,8 @@ pub fn main(init: std.process.Init) !void {
     const scene_file = try std.Io.Dir.cwd().openFile(io, "scene.xml", .{});
     defer scene_file.close(io);
 
-    var scene = try raytracer.Scene.fromXmlFile(allocator, io, scene_file);
-    try scene.renderImg(allocator, io, std.Io.Dir.cwd());
+    const rt = try raytracer.RT3.fromXmlFile(allocator, io, scene_file);
+    try rt.renderAll(allocator, io, std.Io.Dir.cwd());
 }
 
 test {

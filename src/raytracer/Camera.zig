@@ -1,10 +1,13 @@
 const std = @import("std");
 const math = std.math;
-const xml = @import("xml");
+const testing = std.testing;
+
 const vec = @import("vec");
 const Real = vec.Real;
-const Frame = @import("Look.zig").Frame;
+const xml = @import("xml");
+
 const Film = @import("Film.zig");
+const Frame = @import("Look.zig").Frame;
 const Ray = @import("Ray.zig");
 
 const log = std.log.scoped(.camera);
@@ -166,8 +169,6 @@ const Spherical = enum {
         };
     }
 };
-
-const testing = std.testing;
 
 const axis_frame = Frame{
     .origin = .{ 0, 0, 0 },

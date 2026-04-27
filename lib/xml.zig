@@ -1,9 +1,12 @@
 // TODO: Report errors with line numbers.
-// TODO: Possibly add proper support for text inside elements.
 // TODO: Prohibit duplicate tag attributes.
+// TODO: Add builtin tag for including other xml files.
 
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const List = std.DoublyLinkedList;
+const StringHashMap = std.StringHashMap;
+const ArrayList = std.ArrayList;
 
 /// Represents the key value pair of an XML Element attribute.
 pub const Attribute = struct {
@@ -85,7 +88,7 @@ pub const Element = struct {
     node: List.Node = .{},
 
     /// Deinitializes the xml Element by deallocating every attribute and every element that it has.
-    pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *Self, allocator: Allocator) void {
         while (self.attrs.popFirst()) |n| {
             const ptr: *Attribute = @fieldParentPtr("node", n);
             allocator.destroy(ptr);
@@ -182,7 +185,7 @@ pub const ParseError = error{
 };
 
 /// Parses a UTF-8 encoded string into a Xml Document.
-pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
+pub fn parse(str: []const u8, allocator: Allocator) !Element {
     // Skips UTF-8 BOM if present.
     const content_start: usize = if (std.mem.startsWith(u8, str, "\xEF\xBB\xBF")) 3 else 0;
 
@@ -194,38 +197,70 @@ pub fn parse(str: []const u8, allocator: std.mem.Allocator) !Element {
     return elem;
 }
 
-// TODO: Impl a analogous for the attributes.
-/// Iterates `elem`'s children and dispatches each to the matching field in `options`.
+/// Iterates `elem`'s values and dispatches each to the matching field in `options`.
+///
 /// Field names of `options` are the XML element keys; field values are pointers to targets.
-/// Each target type must implement either `fromXml(*const Element) !T`
-/// or `fromXml(Allocator, *const Element) !T` — the allocator is passed only when needed.
-/// Returns the key of the first unrecognized child, or null on success.
-pub fn parseChildren(
-    allocator: std.mem.Allocator,
+/// Each target type must implement either `fromXml(*const Element) !T`,
+/// `fromXml(Allocator, *const Element) !T` or `addFromXml(*@This(), Allocator, *const Element)`.
+///
+/// Fields that implement `fromXml` will be parsed only one time, if the field is found again, the function
+/// will return a `error.DuplicateKey`.
+///
+/// Fields that implement `addFromXml` can be parsed more than one time. This could be useful for filling
+/// a list, for example.
+pub fn parseElemValues(
+    allocator: Allocator,
     options: anytype,
     elem: *const Element,
-) !?[]const u8 {
+) !?ArrayList([]const u8) {
     const fields = @typeInfo(@TypeOf(options)).@"struct".fields;
     var node = elem.values.first;
+
+    var unknown: ArrayList([]const u8) = .empty;
+    errdefer unknown.deinit(allocator);
+
+    var parsed: StringHashMap(void) = .init(allocator);
+    defer parsed.deinit();
+
     while (node) |n| : (node = n.next) {
-        const child: *const Element = @fieldParentPtr("node", n);
+        const value: *const Element = @fieldParentPtr("node", n);
         var matched = false;
 
         inline for (fields) |f| {
-            if (!matched and std.mem.eql(u8, f.name, child.key)) {
+            if (parsed.contains(f.name)) {
+                std.log.err("duplicate key '{s}' found", .{f.name});
+                return error.DuplicateKey;
+            }
+            if (std.mem.eql(u8, f.name, value.key)) {
                 const ptr = @field(options, f.name);
                 const T = @TypeOf(ptr.*);
-                const nparams = @typeInfo(@TypeOf(T.fromXml)).@"fn".params.len;
-                ptr.* = if (nparams == 2)
-                    try T.fromXml(allocator, child)
-                else
-                    try T.fromXml(child);
+                const typename = @typeName(T);
+                if (@hasDecl(T, "fromXml") and @hasDecl(T, "addFromXml")) {
+                    @compileError("'" ++ typename ++ "' could only define 'fromXml' or 'addFromXml'");
+                }
+
+                if (@hasDecl(T, "fromXml")) {
+                    const nparams = @typeInfo(@TypeOf(T.fromXml)).@"fn".params.len;
+                    if (nparams == 2) {
+                        ptr.* = try T.fromXml(allocator, value);
+                    } else if (nparams == 1) {
+                        ptr.* = try T.fromXml(value);
+                    } else {
+                        @compileError("'" ++ typename ++ "' should define 'fromXml(Allocator, Element)' or 'fromXml(Element)'");
+                    }
+                    try parsed.put(f.name, {});
+                } else if (@hasDecl(T, "addFromXml")) {
+                    try ptr.addFromXml(allocator, value);
+                } else {
+                    @compileError("'" ++ typename ++ "' should define one of ['fromXml(Allocator, Element)', 'fromXml(Element)'], or 'addFromXml(*" ++ typename ++ ", Allocator, Element)'");
+                }
                 matched = true;
             }
         }
-        if (!matched) return child.key;
+        if (!matched) try unknown.append(allocator, value.key);
     }
-    return null;
+    if (unknown.items.len == 0) return null;
+    return unknown;
 }
 
 /// Comptime utility: builds "['a', 'b', 'c']" from the field names of type `T`.
@@ -315,7 +350,7 @@ pub fn parseArray(
     return ret;
 }
 
-fn parseElement(lexer: *Lexer, allocator: std.mem.Allocator) !?Element {
+fn parseElement(lexer: *Lexer, allocator: Allocator) !?Element {
     _ = lexer.expectPeek(.tag_start) orelse return null;
     _ = lexer.next();
 
@@ -355,7 +390,7 @@ fn parseElement(lexer: *Lexer, allocator: std.mem.Allocator) !?Element {
     return elem;
 }
 
-fn parseAttributes(lexer: *Lexer, allocator: std.mem.Allocator) !List {
+fn parseAttributes(lexer: *Lexer, allocator: Allocator) !List {
     var attrs = List{};
     while (try parseAttribute(lexer)) |attr| {
         const ptr = try allocator.create(Attribute);

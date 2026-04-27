@@ -30,21 +30,29 @@ pub fn deinit(self: *@This(), gpa: Allocator) void {
 }
 
 pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
-    var world = @This(){};
+    var world: World = .{};
     errdefer world.deinit(gpa);
+    world.materials = try .init(gpa);
+
     var raw_objs = Objects.Raw{};
     defer raw_objs.list.deinit(gpa);
+
     const options = .{
         .background = &world.background,
-        .materials = &world.materials,
-        .objects = &raw_objs,
+        .material = &world.materials,
+        .object = &raw_objs,
     };
-    if (try xml.parseChildren(gpa, options, elem)) |unknown| {
+
+    if (try xml.parseElemValues(gpa, options, elem)) |unknowns| {
         const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
-        log.err("unrecognized option '{s}', expected one of {s}", .{ unknown, keys_str });
+        for (unknowns.items) |u| {
+            log.err("unrecognized option '{s}', expected one of {s}", .{ u, keys_str });
+        }
         return error.UnrecognizedWorldValue;
     }
+
     world.objects = try .init(gpa, raw_objs, &world.materials);
+
     return world;
 }
 
@@ -105,22 +113,16 @@ const Materials = struct {
         try self.list.append(gpa, m);
     }
 
-    pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !@This() {
-        var ret = try @This().init(gpa);
-        errdefer ret.deinit(gpa);
-        var node = elem.values.first;
-        while (node) |n| : (node = n.next) {
-            const m: *const xml.Element = @fieldParentPtr("node", n);
-            if (!eql(u8, m.key, "material")) continue;
-            const name = if (m.queryAttribute("name", null)) |name|
-                name
-            else {
-                log.err("material name is obligatory", .{});
-                return error.ExpectedMaterialName;
-            };
-            try ret.add(gpa, try .fromXml(m), name);
+    pub fn addFromXml(self: *Materials, gpa: Allocator, elem: *const xml.Element) !void {
+        const name = elem.queryAttribute("name", null) orelse {
+            log.err("material name is obligatory", .{});
+            return error.ExpectedMaterialName;
+        };
+        if (eql(u8, name, "default")) {
+            self.list.items[0] = try .fromXml(elem);
+            return;
         }
-        return ret;
+        try self.add(gpa, try .fromXml(elem), name);
     }
 };
 
@@ -183,16 +185,8 @@ const Objects = struct {
     const Raw = struct {
         list: MultiArrayList(Object.Raw) = .empty,
 
-        pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !@This() {
-            var this = @This(){};
-            errdefer this.list.deinit(gpa);
-            var node = elem.values.first;
-            while (node) |n| : (node = n.next) {
-                const c: *const xml.Element = @fieldParentPtr("node", n);
-                if (!eql(u8, c.key, "object")) continue;
-                try this.list.append(gpa, try .fromXml(c));
-            }
-            return this;
+        pub fn addFromXml(self: *Raw, gpa: Allocator, elem: *const xml.Element) !void {
+            try self.list.append(gpa, try .fromXml(elem));
         }
     };
 };
@@ -252,13 +246,9 @@ test "world with object list" {
     const str =
         \\ <world>
         \\    <background type="single_color" color="255 0xff 0xf0" />
-        \\    <materials>
-        \\         <material name="green" type="flat" color="42 201 51"/>
-        \\    </materials>
-        \\    <objects>
-        \\         <object type="sphere" radius="0.4" center="-1 0.5 5" material="green"/>
-        \\         <object type="sphere" radius="0.4" center="1 -0.5 8" material_type="flat" material_color="42 42 42"/>
-        \\    </objects>
+        \\    <material name="green" type="flat" color="42 201 51"/>
+        \\    <object type="sphere" radius="0.4" center="-1 0.5 5" material="green"/>
+        \\    <object type="sphere" radius="0.4" center="1 -0.5 8" material_type="flat" material_color="42 42 42"/>
         \\ </world>
     ;
     const background = Background{
