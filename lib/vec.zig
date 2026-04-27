@@ -46,6 +46,12 @@ pub fn dot(
     return @reduce(.Add, u * v);
 }
 
+pub fn det3(T: type, m: [3]@Vector(3, T)) T {
+    return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+        m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+        m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+}
+
 /// Computes a direction vector from a spherical coordinate.
 pub fn sphericalDirection(sin_theta: f64, cos_theta: f64, phi: f64) Real(3) {
     return .{
@@ -126,6 +132,11 @@ test "normalize: zero vector returns zero vector" {
     const v = @Vector(3, f32){ 0, 0, 0 };
     const result = normalize(3, f32, v);
     try testing.expectEqual(@Vector(3, f32){ 0, 0, 0 }, result);
+}
+
+test "det3: zero" {
+    const m: [3]@Vector(3, f64) = .{ .{ 1, 2, 3 }, .{ 4, 5, 6 }, .{ 7, 8, 9 } };
+    try testing.expectApproxEqRel(0.0, det3(f64, m), 0.0001);
 }
 
 test "sphericalDirection: north pole" {
