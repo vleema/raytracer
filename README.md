@@ -20,6 +20,14 @@ zig build tests
 
 For more options you can check `zig build -h` in the section `steps`.
 
+## Just
+
+You can use the justfile in the root directory of the project, see:
+
+```bash
+just -l
+```
+
 ## Nix
 
 The project contains a flake that bootstraps a devShell a package and some

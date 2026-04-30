@@ -32,6 +32,7 @@
       filter = path: type:
         type
         == "directory"
+        || (baseNameOf path == "justfile")
         || (builtins.match ".*\.(zig|zon)" path != null);
     };
   in
@@ -39,7 +40,7 @@
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
         buildInputs = [];
-        nativeBuildInputs = [pkgs.zig_0_16];
+        nativeBuildInputs = with pkgs; [zig_0_16 just];
       in {
         # nix develop
         devShells = {
@@ -59,7 +60,8 @@
             name = pname;
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-              zig build -Doptimize=ReleaseFast --prefix $out
+              ls
+              just build-release
             '';
           };
         };
@@ -70,14 +72,14 @@
             pname = "${pname}-tests";
             buildPhase = ''
               export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-              zig build test --summary all
+              just test
             '';
           };
           lint = pkgs.stdenv.mkDerivation {
             inherit version src buildInputs;
             pname = "${pname}-lint";
             nativeBuildInputs = with pkgs; [zig-zlint] ++ nativeBuildInputs;
-            buildPhase = ''zlint'';
+            buildPhase = "just lint";
           };
         };
       }
