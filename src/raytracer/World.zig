@@ -5,8 +5,6 @@ const MultiArrayList = std.MultiArrayList;
 const eql = std.mem.eql;
 const testing = std.testing;
 
-const vec = @import("vec");
-const Real = vec.Real;
 const xml = @import("xml");
 
 const img = @import("img.zig");
@@ -14,6 +12,7 @@ const Color = img.Color;
 const Material = @import("Material.zig");
 const Object = @import("Object.zig");
 const Sphere = Object.Sphere;
+const Triangle = Object.Triangle;
 const Ray = @import("Ray.zig");
 
 const World = @This();
@@ -68,6 +67,7 @@ pub fn objHit(self: *const World, r: *const Ray) ?struct { hit: Object.Hit, mate
     for (tags, commons, self.objects.materials.items) |t, c, m| {
         const hit = switch (t) {
             .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
+            .triangle => self.objects.triangles.items[c.extra_idx].hit(r, tmin, tmax),
         };
         if (hit) |h| {
             closest_hit = h;
@@ -131,6 +131,7 @@ const Objects = struct {
     materials: ArrayList(u16) = .empty,
 
     spheres: ArrayList(Sphere) = .empty,
+    triangles: ArrayList(Triangle) = .empty,
 
     fn init(gpa: Allocator, raw: Objects.Raw, materials: *Materials) !@This() {
         std.debug.assert(materials.list.items.len < std.math.maxInt(u16));
@@ -160,11 +161,16 @@ const Objects = struct {
         }
 
         for (raw.list.items(.inner)) |i| {
-            var idx: usize = undefined;
+            // SAFETY: `idx` is handled exhaustively in the switch below.
+            var idx: u32 = undefined;
             switch (i) {
                 .sphere => {
-                    idx = this.spheres.items.len;
+                    idx = @intCast(this.spheres.items.len);
                     try this.spheres.append(gpa, i.sphere);
+                },
+                .triangle => {
+                    idx = @intCast(this.triangles.items.len);
+                    try this.triangles.append(gpa, i.triangle);
                 },
             }
             try this.list.append(gpa, .{

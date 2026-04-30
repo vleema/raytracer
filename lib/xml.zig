@@ -339,6 +339,7 @@ pub fn parseArray(
     cb: fn ([]const u8) anyerror!T,
     val: []const u8,
 ) ![N]T {
+    // SAFETY: `ret` is initialized in a for loop with all it's elements.
     var ret: [N]T = @splat(undefined);
     var it = std.mem.splitScalar(u8, val, ' ');
     inline for (&ret) |*r| {
