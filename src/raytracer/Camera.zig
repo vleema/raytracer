@@ -16,6 +16,16 @@ pub const Camera = union(enum) {
     spherical: Spherical,
     rectangular: Rectangular,
 
+    pub fn preprocess(self: *const Camera, width: u32, height: u32) void {
+        const w: f32 = @floatFromInt(width);
+        const h: f32 = @floatFromInt(height);
+
+        return switch (self.*) {
+            .rectangular => |r| r.preprocesss(w, h),
+            .spherical => {},
+        };
+    }
+
     /// Generates a ray coming out of the `Camera`.
     ///
     /// Returns the generated ray.
@@ -27,10 +37,10 @@ pub const Camera = union(enum) {
         height: u32,
         frame: *const Frame,
     ) Ray {
-        const w: f64 = @floatFromInt(width);
-        const h: f64 = @floatFromInt(height);
-        const ix: f64 = @floatFromInt(img_x);
-        const iy: f64 = @floatFromInt(img_y);
+        const w: f32 = @floatFromInt(width);
+        const h: f32 = @floatFromInt(height);
+        const ix: f32 = @floatFromInt(img_x);
+        const iy: f32 = @floatFromInt(img_y);
 
         return switch (self.*) {
             .rectangular => |r| r.generateRay(ix, iy, w, h, frame),
@@ -46,7 +56,7 @@ pub const Camera = union(enum) {
         if (eql(u8, typ, "orthographic")) {
             var cam: @This() = .{ .rectangular = .{ .orthographic = .{} } };
             const sw_val = elem.queryAttribute("screen_window", null) orelse return cam;
-            const sw = try xml.parseFloatArray(f64, 4, sw_val);
+            const sw = try xml.parseFloatArray(f32, 4, sw_val);
             cam.rectangular.orthographic = .{ .left = sw[0], .right = sw[1], .bottom = sw[2], .top = sw[3] };
             return cam;
         }
@@ -79,22 +89,27 @@ const Rectangular = union(enum) {
     },
 
     const ScreenWindow = struct {
-        left: f64 = -5.3,
-        right: f64 = 5.3,
-        bottom: f64 = -4,
-        top: f64 = 4,
+        left: f32 = -5.3,
+        right: f32 = 5.3,
+        bottom: f32 = -4,
+        top: f32 = 4,
     };
+
+    var sw: ScreenWindow = undefined;
+
+    fn preprocesss(self: *const Rectangular, width: f32, height: f32) void {
+        const ar = width / height;
+        sw = self.screenWindow(ar);
+    }
 
     fn generateRay(
         self: *const @This(),
-        img_x: f64,
-        img_y: f64,
-        width: f64,
-        height: f64,
+        img_x: f32,
+        img_y: f32,
+        width: f32,
+        height: f32,
         frame: *const Frame,
     ) Ray {
-        const aspect_ratio = width / height;
-        const sw = self.screenWindow(aspect_ratio);
         const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * img_x / width);
         const sw_y: Real(3) = @splat(sw.top + (sw.bottom - sw.top) * img_y / height);
 
@@ -110,11 +125,11 @@ const Rectangular = union(enum) {
         };
     }
 
-    fn screenWindow(self: *const @This(), aspect_ratio: f64) ScreenWindow {
+    fn screenWindow(self: *const @This(), aspect_ratio: f32) ScreenWindow {
         return switch (self.*) {
             .orthographic => |e| e,
             .perspective => |p| blk: {
-                const h = @tan(math.degreesToRadians(@as(f64, @floatFromInt(p.fovy))) / 2.0);
+                const h = @tan(math.degreesToRadians(@as(f32, @floatFromInt(p.fovy))) / 2.0);
                 break :blk ScreenWindow{
                     .left = -aspect_ratio * h,
                     .right = aspect_ratio * h,
@@ -132,16 +147,16 @@ const Spherical = enum {
 
     fn generateRay(
         self: *const @This(),
-        img_x: f64,
-        img_y: f64,
-        width: f64,
-        height: f64,
+        img_x: f32,
+        img_y: f32,
+        width: f32,
+        height: f32,
         frame: *const Frame,
     ) Ray {
         return switch (self.*) {
             .equirectangular => blk: {
-                const u: f64 = img_x / width;
-                const v: f64 = img_y / height;
+                const u: f32 = img_x / width;
+                const v: f32 = img_y / height;
                 const phi = 2.0 * math.pi * u;
                 const theta = math.pi * v;
                 break :blk Ray{
@@ -203,29 +218,29 @@ test "orthographic: direction is always frame direction" {
     const cam: Camera = .{ .rectangular = .{ .orthographic = .{} } };
     const film = Film{ .width = 4, .height = 4 };
     const ray = cam.generateRay(3, 1, film.width, film.height, &axis_frame);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
 
 test "perspective: origin is always frame origin" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
     const ray = cam.generateRay(1, 3, film.width, film.height, &axis_frame);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ray.origin);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 0 }), ray.origin);
 }
 
 test "perspective: center pixel direction equals frame direction" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
     const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
 
 test "spherical: origin is always frame origin" {
     const film = Film{ .width = 4, .height = 4 };
     const eq = Camera{ .spherical = .equirectangular };
     const ea = Camera{ .spherical = .equal_area };
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), eq.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 0 }), ea.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 0 }), eq.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 0 }), ea.generateRay(2, 1, film.width, film.height, &axis_frame).origin);
 }
 
 test "equirectangular: top row maps to north pole" {
@@ -233,5 +248,5 @@ test "equirectangular: top row maps to north pole" {
     const film = Film{ .width = 4, .height = 4 };
     // theta = pi * 0/4 = 0 -> sin=0, cos=1 -> {0, 0, 1} for any phi.
     const ray = cam.generateRay(2, 0, film.width, film.height, &axis_frame);
-    try testing.expectEqual(@as(@Vector(3, f64), .{ 0, 0, 1 }), ray.direction);
+    try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }

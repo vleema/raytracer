@@ -1,7 +1,4 @@
 const std = @import("std");
-const ArrayList = std.ArrayList;
-const Allocator = std.mem.Allocator;
-const Io = std.Io;
 
 const xml = @import("xml");
 
@@ -24,6 +21,8 @@ pub const Integrator = union(enum) {
         width: u32,
         height: u32,
     ) !void {
+        camera.preprocess(width, height);
+
         return switch (self.*) {
             .flat => Flat.render(buf, world, camera, frame, width, height),
         };

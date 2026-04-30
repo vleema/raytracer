@@ -34,14 +34,14 @@ pub const Common = struct {
 };
 
 pub const Sphere = struct {
-    center: [3]f64 = .{ -1.0, 0.5, 5.0 },
-    radius: f64 = 0.4,
+    center: [3]f32 = .{ -1.0, 0.5, 5.0 },
+    radius: f32 = 0.4,
 
-    pub fn hit(self: *const @This(), r: *const Ray, tmin: f64, tmax: f64) ?Hit {
+    pub fn hit(self: *const @This(), r: *const Ray, tmin: f32, tmax: f32) ?Hit {
         const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
-        const a = vec.dot(3, f64, r.direction, r.direction);
-        const h = vec.dot(3, f64, r.direction, oc);
-        const c = vec.dot(3, f64, oc, oc) - self.radius * self.radius;
+        const a = vec.dot(3, f32, r.direction, r.direction);
+        const h = vec.dot(3, f32, r.direction, oc);
+        const c = vec.dot(3, f32, oc, oc) - self.radius * self.radius;
         const discriminant = h * h - a * c;
         if (discriminant < 1e-8) return null;
 
@@ -66,39 +66,39 @@ pub const Sphere = struct {
             return error.ExpectedSphereCenter;
         };
         return .{
-            .radius = try std.fmt.parseFloat(f64, radius),
-            .center = try xml.parseFloatArray(f64, 3, center),
+            .radius = try std.fmt.parseFloat(f32, radius),
+            .center = try xml.parseFloatArray(f32, 3, center),
         };
     }
 };
 
 pub const Triangle = struct {
-    v1: [3]f64,
-    v2: [3]f64,
-    v3: [3]f64,
+    v1: [3]f32,
+    v2: [3]f32,
+    v3: [3]f32,
 
-    pub fn hit(self: *const Triangle, r: *const Ray, tmin: f64, tmax: f64) ?Hit {
+    pub fn hit(self: *const Triangle, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
         // Möller Trumbore algorithm.
         const e1 = @as(Real(3), self.v2) - @as(Real(3), self.v1);
         const e2 = @as(Real(3), self.v3) - @as(Real(3), self.v1);
 
-        const pvec = vec.cross3(f64, r.direction, e2);
-        const det = vec.dot(3, f64, e1, pvec);
+        const pvec = vec.cross3(f32, r.direction, e2);
+        const det = vec.dot(3, f32, e1, pvec);
         if (@abs(det) < 1e-8) return null;
         const inv_det = 1.0 / det;
 
         const svec = @as(Real(3), r.origin) - @as(Real(3), self.v1);
-        const beta = vec.dot(3, f64, svec, pvec) * inv_det;
+        const beta = vec.dot(3, f32, svec, pvec) * inv_det;
         if (beta < 0 or beta > 1) return null;
 
-        const qvec = vec.cross3(f64, svec, e1);
-        const gamma = vec.dot(3, f64, r.direction, qvec) * inv_det;
+        const qvec = vec.cross3(f32, svec, e1);
+        const gamma = vec.dot(3, f32, r.direction, qvec) * inv_det;
         if (gamma < 0 or beta + gamma > 1.0) return null;
 
-        const t = vec.dot(3, f64, e2, qvec) * inv_det;
+        const t = vec.dot(3, f32, e2, qvec) * inv_det;
         if (t < tmin or t > tmax) return null;
 
-        return .{ .t = t, .normal = vec.normalize(3, f64, vec.cross3(f64, e1, e2)) };
+        return .{ .t = t, .normal = vec.normalize(3, f32, vec.cross3(f32, e1, e2)) };
     }
 
     pub fn fromXml(elem: *const xml.Element) !Triangle {
@@ -116,16 +116,16 @@ pub const Triangle = struct {
         };
 
         return .{
-            .v1 = try xml.parseFloatArray(f64, 3, v1),
-            .v2 = try xml.parseFloatArray(f64, 3, v2),
-            .v3 = try xml.parseFloatArray(f64, 3, v3),
+            .v1 = try xml.parseFloatArray(f32, 3, v1),
+            .v2 = try xml.parseFloatArray(f32, 3, v2),
+            .v3 = try xml.parseFloatArray(f32, 3, v3),
         };
     }
 };
 
 pub const Hit = struct {
-    t: f64,
-    normal: [3]f64,
+    t: f32,
+    normal: [3]f32,
 };
 
 pub const Raw = struct {

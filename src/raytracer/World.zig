@@ -57,7 +57,7 @@ pub fn fromXml(gpa: Allocator, elem: *const xml.Element) !World {
 
 pub fn objHit(self: *const World, r: *const Ray) ?struct { hit: Object.Hit, material: Material } {
     const tmin = 0;
-    var tmax = std.math.inf(f64);
+    var tmax = std.math.inf(f32);
     var closest_hit: ?Object.Hit = null;
     var material: ?Material = null;
 
@@ -234,7 +234,7 @@ pub const Background = union(enum) {
         return error.InvalidBackgroundType;
     }
 
-    pub fn ptColor(self: *const @This(), width: u32, height: u32, pt: [2]f64) Color {
+    pub fn ptColor(self: *const @This(), width: u32, height: u32, pt: [2]f32) Color {
         return switch (self.*) {
             .single_color => |b| b.color,
             .four_colors => |b| img.bilerp(

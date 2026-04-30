@@ -1,5 +1,4 @@
 const std = @import("std");
-const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const eql = std.mem.eql;

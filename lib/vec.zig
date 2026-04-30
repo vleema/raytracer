@@ -3,7 +3,7 @@ const math = std.math;
 
 /// Represents a element of the real vector space.
 pub fn Real(N: comptime_int) type {
-    return @Vector(N, f64);
+    return @Vector(N, f32);
 }
 
 /// Normalizes a vector, i.e. divides is elements by it's size and returns the resulting vector.
@@ -53,7 +53,7 @@ pub fn det3(T: type, m: [3]@Vector(3, T)) T {
 }
 
 /// Computes a direction vector from a spherical coordinate.
-pub fn sphericalDirection(sin_theta: f64, cos_theta: f64, phi: f64) Real(3) {
+pub fn sphericalDirection(sin_theta: f32, cos_theta: f32, phi: f32) Real(3) {
     return .{
         math.clamp(sin_theta, -1, 1) * @cos(phi),
         math.clamp(sin_theta, -1, 1) * @sin(phi),
@@ -62,12 +62,12 @@ pub fn sphericalDirection(sin_theta: f64, cos_theta: f64, phi: f64) Real(3) {
 }
 
 /// Returns the spherical theta from a vector.
-pub fn sphericalTheta(w: Real(3)) f64 {
+pub fn sphericalTheta(w: Real(3)) f32 {
     return math.acos(math.clamp(w[2], -1, 1));
 }
 
 /// Returns the spherical phi from a vector.
-pub fn sphericalPhi(w: Real(3)) f64 {
+pub fn sphericalPhi(w: Real(3)) f32 {
     const phi = math.atan2(w[1], w[0]);
     return if (phi < 0) phi + 2 * math.pi else phi;
 }
@@ -135,8 +135,8 @@ test "normalize: zero vector returns zero vector" {
 }
 
 test "det3: zero" {
-    const m: [3]@Vector(3, f64) = .{ .{ 1, 2, 3 }, .{ 4, 5, 6 }, .{ 7, 8, 9 } };
-    try testing.expectApproxEqRel(0.0, det3(f64, m), 0.0001);
+    const m: [3]@Vector(3, f32) = .{ .{ 1, 2, 3 }, .{ 4, 5, 6 }, .{ 7, 8, 9 } };
+    try testing.expectApproxEqRel(0.0, det3(f32, m), 0.0001);
 }
 
 test "sphericalDirection: north pole" {
@@ -151,13 +151,13 @@ test "sphericalDirection: equator at phi=0 points along +x" {
 
 test "sphericalDirection: equator at phi=pi/2 points along +y" {
     const d = sphericalDirection(1, 0, math.pi / 2.0);
-    try testing.expectApproxEqAbs(@as(f64, 0), d[0], 1e-9);
-    try testing.expectApproxEqAbs(@as(f64, 1), d[1], 1e-9);
-    try testing.expectApproxEqAbs(@as(f64, 0), d[2], 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 0), d[0], 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 1), d[1], 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 0), d[2], 1e-9);
 }
 
 test "sphericalTheta: north pole returns 0" {
-    try testing.expectEqual(@as(f64, 0), sphericalTheta(.{ 0, 0, 1 }));
+    try testing.expectEqual(@as(f32, 0), sphericalTheta(.{ 0, 0, 1 }));
 }
 
 test "sphericalTheta: equator returns pi/2" {
@@ -169,7 +169,7 @@ test "sphericalTheta: south pole returns pi" {
 }
 
 test "sphericalPhi: positive x axis returns 0" {
-    try testing.expectApproxEqAbs(@as(f64, 0), sphericalPhi(.{ 1, 0, 0 }), 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 0), sphericalPhi(.{ 1, 0, 0 }), 1e-9);
 }
 
 test "sphericalPhi: positive y axis returns pi/2" {
