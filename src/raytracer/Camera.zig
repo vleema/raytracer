@@ -95,6 +95,7 @@ const Rectangular = union(enum) {
         top: f32 = 4,
     };
 
+    // SAFETY: Screen window is calculated only one time at the pre-process function, synchronously.
     var sw: ScreenWindow = undefined;
 
     fn preprocesss(self: *const Rectangular, width: f32, height: f32) void {
