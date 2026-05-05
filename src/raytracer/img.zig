@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const vec = @import("vec");
-const Real = vec.Real;
 const xml = @import("xml");
 
 pub const Pixel = struct {

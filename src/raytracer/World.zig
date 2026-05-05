@@ -13,6 +13,7 @@ const Material = @import("Material.zig");
 const Object = @import("Object.zig");
 const Sphere = Object.Sphere;
 const Triangle = Object.Triangle;
+const Plane = Object.Plane;
 const Ray = @import("Ray.zig");
 
 const World = @This();
@@ -68,6 +69,7 @@ pub fn objHit(self: *const World, r: *const Ray) ?struct { hit: Object.Hit, mate
         const hit = switch (t) {
             .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
             .triangle => self.objects.triangles.items[c.extra_idx].hit(r, tmin, tmax),
+            .plane => self.objects.planes.items[c.extra_idx].hit(r, tmin, tmax),
         };
         if (hit) |h| {
             closest_hit = h;
@@ -132,6 +134,7 @@ const Objects = struct {
 
     spheres: ArrayList(Sphere) = .empty,
     triangles: ArrayList(Triangle) = .empty,
+    planes: ArrayList(Plane) = .empty,
 
     fn init(gpa: Allocator, raw: Objects.Raw, materials: *Materials) !@This() {
         std.debug.assert(materials.list.items.len < std.math.maxInt(u16));
@@ -171,6 +174,10 @@ const Objects = struct {
                 .triangle => {
                     idx = @intCast(this.triangles.items.len);
                     try this.triangles.append(gpa, i.triangle);
+                },
+                .plane => {
+                    idx = @intCast(this.planes.items.len);
+                    try this.planes.append(gpa, i.plane);
                 },
             }
             try this.list.append(gpa, .{

@@ -19,10 +19,12 @@ common: Common,
 pub const Tag = enum {
     sphere,
     triangle,
+    plane,
 
     pub fn fromStr(str: []const u8) !@This() {
         if (eql(u8, str, "sphere")) return .sphere;
         if (eql(u8, str, "triangle")) return .triangle;
+        if (eql(u8, str, "plane")) return .plane;
 
         log.err("expected one of ['sphere', 'triangle'], found '{s}'", .{str});
         return error.InvalidObjectTag;
@@ -123,6 +125,40 @@ pub const Triangle = struct {
     }
 };
 
+pub const Plane = struct {
+    pos: [3]f32,
+    normal: [3]f32,
+
+    pub fn hit(self: *const Plane, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
+        // Given the Ray equation: P(t) = o + td
+        // And the plane equation: (P - P0) . N = 0
+        // A ray intersects a plane when:
+        //  o + td = (R + td - P0) . N
+        //  => t = ((P0 - o) . N) / d . N
+        const rdir_dot_pnorm = vec.dot(3, f32, r.direction, self.normal);
+        if (rdir_dot_pnorm == 0) return null;
+
+        const t = vec.dot(3, f32, @as(Real(3), self.pos) - @as(Real(3), r.origin), self.normal) / rdir_dot_pnorm;
+        if (t < tmin or t > tmax) return null;
+
+        return .{ .t = t, .normal = self.normal };
+    }
+
+    pub fn fromXml(elem: *const xml.Element) !Plane {
+        const pos = elem.queryAttribute("pos", null) orelse {
+            log.err("expected plane pos", .{});
+            return error.ExpectedPlanePos;
+        };
+        const v = elem.queryAttribute("vec", null) orelse {
+            log.err("expected plane vec", .{});
+            return error.ExpectedPlaneVector;
+        };
+        const normal = vec.normalize(3, f32, try xml.parseFloatArray(f32, 3, v));
+
+        return .{ .pos = try xml.parseFloatArray(f32, 3, pos), .normal = normal };
+    }
+};
+
 pub const Hit = struct {
     t: f32,
     normal: [3]f32,
@@ -132,6 +168,7 @@ pub const Raw = struct {
     inner: union(Tag) {
         sphere: Sphere,
         triangle: Triangle,
+        plane: Plane,
     },
 
     material: ?union(enum) {
@@ -153,6 +190,7 @@ pub const Raw = struct {
         switch (tag) {
             .sphere => this.inner = .{ .sphere = try .fromXml(elem) },
             .triangle => this.inner = .{ .triangle = try .fromXml(elem) },
+            .plane => this.inner = .{ .plane = try .fromXml(elem) },
         }
 
         if (elem.queryAttribute("material_type", null)) |t| {
