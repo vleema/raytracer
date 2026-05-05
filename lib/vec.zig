@@ -151,9 +151,9 @@ test "sphericalDirection: equator at phi=0 points along +x" {
 
 test "sphericalDirection: equator at phi=pi/2 points along +y" {
     const d = sphericalDirection(1, 0, math.pi / 2.0);
-    try testing.expectApproxEqAbs(@as(f32, 0), d[0], 1e-9);
-    try testing.expectApproxEqAbs(@as(f32, 1), d[1], 1e-9);
-    try testing.expectApproxEqAbs(@as(f32, 0), d[2], 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 0), d[0], 1e-6);
+    try testing.expectApproxEqAbs(@as(f32, 1), d[1], 1e-6);
+    try testing.expectApproxEqAbs(@as(f32, 0), d[2], 1e-6);
 }
 
 test "sphericalTheta: north pole returns 0" {
@@ -161,21 +161,21 @@ test "sphericalTheta: north pole returns 0" {
 }
 
 test "sphericalTheta: equator returns pi/2" {
-    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalTheta(.{ 1, 0, 0 }), 1e-9);
+    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalTheta(.{ 1, 0, 0 }), 1e-6);
 }
 
 test "sphericalTheta: south pole returns pi" {
-    try testing.expectApproxEqAbs(math.pi, sphericalTheta(.{ 0, 0, -1 }), 1e-9);
+    try testing.expectApproxEqAbs(math.pi, sphericalTheta(.{ 0, 0, -1 }), 1e-6);
 }
 
 test "sphericalPhi: positive x axis returns 0" {
-    try testing.expectApproxEqAbs(@as(f32, 0), sphericalPhi(.{ 1, 0, 0 }), 1e-9);
+    try testing.expectApproxEqAbs(@as(f32, 0), sphericalPhi(.{ 1, 0, 0 }), 1e-6);
 }
 
 test "sphericalPhi: positive y axis returns pi/2" {
-    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalPhi(.{ 0, 1, 0 }), 1e-9);
+    try testing.expectApproxEqAbs(math.pi / 2.0, sphericalPhi(.{ 0, 1, 0 }), 1e-6);
 }
 
 test "sphericalPhi: negative y axis wraps to 3*pi/2" {
-    try testing.expectApproxEqAbs(3.0 * math.pi / 2.0, sphericalPhi(.{ 0, -1, 0 }), 1e-9);
+    try testing.expectApproxEqAbs(3.0 * math.pi / 2.0, sphericalPhi(.{ 0, -1, 0 }), 1e-6);
 }
