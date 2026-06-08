@@ -14,15 +14,18 @@ pub const Color = struct {
 
     const color_log = std.log.scoped(.color);
 
-    // TODO: Add support for hex.
     pub fn fromStr(str: ?[]const u8) !@This() {
         const clamp = std.math.clamp;
 
         if (str == null or str.?.len == 0) return .{};
 
-        const arr = if (xml.parseUnsignedArray(u8, 3, str.?)) |arr|
-            arr
-        else |_| blk: {
+        const arr = if (str.len == 7 and str[0] == '#')
+            .{
+                try std.fmt.parseUnsigned(u8, str[1..3], 16),
+                try std.fmt.parseUnsigned(u8, str[3..5], 16),
+                try std.fmt.parseUnsigned(u8, str[5..7], 16),
+            }
+        else blk: {
             const arr = try xml.parseFloatArray(f32, 3, str.?);
             inline for (arr) |v| {
                 if (v < 0 or v > 1) {
@@ -36,6 +39,7 @@ pub const Color = struct {
                 clamp(@as(u8, @intFromFloat(arr[2] * 255)), 0, 255),
             };
         };
+
         return .{ .r = arr[0], .g = arr[1], .b = arr[2] };
     }
 
@@ -73,4 +77,11 @@ pub fn bilerp(
 
 fn factor(x1: f32, x2: f32, x: f32) f32 {
     return std.math.clamp((x - x1) / (x2 - x1), 0, 1);
+}
+
+test "Color: from hex str" {
+    const str = "#ffa0bc";
+    const actual = try Color.fromStr(str);
+    const expected = Color{ .r = 255, .g = 160, .b = 188 };
+    try std.testing.expectEqual(expected, actual);
 }
