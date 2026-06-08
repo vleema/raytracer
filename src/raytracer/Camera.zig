@@ -200,6 +200,7 @@ test "orthographic: top-left pixel maps to screen window corner" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
+    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(0, 0, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ -2, 2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
@@ -211,6 +212,7 @@ test "orthographic: center pixel maps to screen window center" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
+    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
@@ -218,6 +220,7 @@ test "orthographic: center pixel maps to screen window center" {
 test "orthographic: direction is always frame direction" {
     const cam: Camera = .{ .rectangular = .{ .orthographic = .{} } };
     const film = Film{ .width = 4, .height = 4 };
+    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(3, 1, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
@@ -225,6 +228,7 @@ test "orthographic: direction is always frame direction" {
 test "perspective: origin is always frame origin" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
+    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(1, 3, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 0 }), ray.origin);
 }
@@ -232,6 +236,7 @@ test "perspective: origin is always frame origin" {
 test "perspective: center pixel direction equals frame direction" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
+    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
