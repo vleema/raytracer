@@ -46,6 +46,41 @@ pub fn dot(
     return @reduce(.Add, u * v);
 }
 
+/// Wrapper for @Vector(N, T) (+).
+pub fn add(
+    N: comptime_int,
+    T: type,
+    u: @Vector(N, T),
+    v: @Vector(N, T),
+) @Vector(N, T) {
+    return u + v;
+}
+
+/// Wrapper for @Vector(N, T) (-).
+pub fn sub(
+    N: comptime_int,
+    T: type,
+    u: @Vector(N, T),
+    v: @Vector(N, T),
+) @Vector(N, T) {
+    return u - v;
+}
+
+/// Wrapper for @Vector(N, T) (*).
+pub fn mul(
+    N: comptime_int,
+    T: type,
+    u: @Vector(N, T),
+    v: @Vector(N, T),
+) @Vector(N, T) {
+    return u * v;
+}
+
+/// Helper for calculating scalar multiplication.
+pub fn mul_scalar(N: comptime_int, T: type, s: T, v: @Vector(N, T)) @Vector(N, T) {
+    return @as(@Vector(N, T), @splat(s)) * v;
+}
+
 pub fn det3(T: type, m: [3]@Vector(3, T)) T {
     return m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
         m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
