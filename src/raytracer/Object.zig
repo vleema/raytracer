@@ -1,10 +1,8 @@
 const std = @import("std");
-const eql = std.mem.eql;
 const testing = std.testing;
 
 const vec = @import("vec");
 const Real = vec.Real;
-const xml = @import("xml");
 
 const Material = @import("Material.zig");
 const Ray = @import("Ray.zig");
@@ -20,15 +18,6 @@ pub const Tag = enum {
     sphere,
     triangle,
     plane,
-
-    pub fn fromStr(str: []const u8) !@This() {
-        if (eql(u8, str, "sphere")) return .sphere;
-        if (eql(u8, str, "triangle")) return .triangle;
-        if (eql(u8, str, "plane")) return .plane;
-
-        log.err("expected one of ['sphere', 'triangle'], found '{s}'", .{str});
-        return error.InvalidObjectTag;
-    }
 };
 
 pub const Common = struct {
@@ -57,21 +46,6 @@ pub const Sphere = struct {
 
         return .{ .t = t, .normal = normal };
     }
-
-    pub fn fromXml(elem: *const xml.Element) !Sphere {
-        const radius = elem.queryAttribute("radius", null) orelse {
-            log.err("expected sphere radius in object definition", .{});
-            return error.ExpectedSphereRadius;
-        };
-        const center = elem.queryAttribute("center", null) orelse {
-            log.err("expected sphere center in object definition", .{});
-            return error.ExpectedSphereCenter;
-        };
-        return .{
-            .radius = try std.fmt.parseFloat(f32, radius),
-            .center = try xml.parseFloatArray(f32, 3, center),
-        };
-    }
 };
 
 pub const Triangle = struct {
@@ -80,7 +54,6 @@ pub const Triangle = struct {
     v3: [3]f32,
 
     pub fn hit(self: *const Triangle, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
-        // Möller Trumbore algorithm.
         const e1 = @as(Real(3), self.v2) - @as(Real(3), self.v1);
         const e2 = @as(Real(3), self.v3) - @as(Real(3), self.v1);
 
@@ -102,39 +75,25 @@ pub const Triangle = struct {
 
         return .{ .t = t, .normal = vec.normalize(3, f32, vec.cross3(f32, e1, e2)) };
     }
-
-    pub fn fromXml(elem: *const xml.Element) !Triangle {
-        const v1 = elem.queryAttribute("v1", null) orelse {
-            log.err("expected 'v1' vertice for triangle object", .{});
-            return error.ExpectedTriangleVertice;
-        };
-        const v2 = elem.queryAttribute("v2", null) orelse {
-            log.err("expected 'v2' vertice for triangle object", .{});
-            return error.ExpectedTriangleVertice;
-        };
-        const v3 = elem.queryAttribute("v3", null) orelse {
-            log.err("expected 'v3' vertice for triangle object", .{});
-            return error.ExpectedTriangleVertice;
-        };
-
-        return .{
-            .v1 = try xml.parseFloatArray(f32, 3, v1),
-            .v2 = try xml.parseFloatArray(f32, 3, v2),
-            .v3 = try xml.parseFloatArray(f32, 3, v3),
-        };
-    }
 };
 
 pub const Plane = struct {
     pos: [3]f32,
     normal: [3]f32,
 
+    const Raw = struct {
+        pos: [3]f32,
+        dir: [3]f32,
+
+        pub fn intoInternal(self: @This()) Plane {
+            return .{
+                .pos = self.pos,
+                .normal = vec.normalize(3, f32, self.dir),
+            };
+        }
+    };
+
     pub fn hit(self: *const Plane, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
-        // Given the Ray equation: P(t) = o + td
-        // And the plane equation: (P - P0) . N = 0
-        // A ray intersects a plane when:
-        //  o + td = (R + td - P0) . N
-        //  => t = ((P0 - o) . N) / d . N
         const rdir_dot_pnorm = vec.dot(3, f32, r.direction, self.normal);
         if (rdir_dot_pnorm == 0) return null;
 
@@ -142,20 +101,6 @@ pub const Plane = struct {
         if (t < tmin or t > tmax) return null;
 
         return .{ .t = t, .normal = self.normal };
-    }
-
-    pub fn fromXml(elem: *const xml.Element) !Plane {
-        const pos = elem.queryAttribute("pos", null) orelse {
-            log.err("expected plane pos", .{});
-            return error.ExpectedPlanePos;
-        };
-        const v = elem.queryAttribute("vec", null) orelse {
-            log.err("expected plane vec", .{});
-            return error.ExpectedPlaneVector;
-        };
-        const normal = vec.normalize(3, f32, try xml.parseFloatArray(f32, 3, v));
-
-        return .{ .pos = try xml.parseFloatArray(f32, 3, pos), .normal = normal };
     }
 };
 
@@ -168,122 +113,11 @@ pub const Raw = struct {
     inner: union(Tag) {
         sphere: Sphere,
         triangle: Triangle,
-        plane: Plane,
+        plane: Plane.Raw,
     },
+    material: ?[]const u8 = null,
 
-    material: ?union(enum) {
-        anon: Material,
-        name: []const u8,
-    } = null,
-
-    pub fn fromXml(elem: *const xml.Element) !Raw {
-        var anon_material = false;
-        // SAFETY: `this.inner` is initialized just after.
-        var this: Raw = .{ .inner = undefined };
-
-        const typ = elem.queryAttribute("type", null) orelse {
-            log.err("expected object type", .{});
-            return error.ExpectedObjectType;
-        };
-
-        const tag = try Tag.fromStr(typ);
-        switch (tag) {
-            .sphere => this.inner = .{ .sphere = try .fromXml(elem) },
-            .triangle => this.inner = .{ .triangle = try .fromXml(elem) },
-            .plane => this.inner = .{ .plane = try .fromXml(elem) },
-        }
-
-        if (elem.queryAttribute("material_type", null)) |t| {
-            this.material =
-                if (elem.queryAttribute("material_color", null)) |c|
-                    .{ .anon = .{ .typ = try .fromStr(t), .color = try .fromStr(c) } }
-                else
-                    .{ .anon = .{ .typ = try .fromStr(t) } };
-            anon_material = true;
-        }
-        if (elem.queryAttribute("material", null)) |m| {
-            if (anon_material) {
-                log.err("'material' and ['material_type', 'material_color'] options cannot coexist", .{});
-                return error.DuplicateMaterialType;
-            }
-            this.material = .{ .name = m };
-        }
-
-        return this;
+    pub fn intoInternal(self: @This()) Raw {
+        return self;
     }
 };
-
-test "fromXml: sphere with anon material" {
-    const str =
-        \\ <root>
-        \\    <object type="sphere" radius="0.4" center="-1 -1.5 3.5" material_type="flat" material_color="42 201 51" />
-        \\ </root>
-    ;
-    var root = try xml.parse(str, testing.allocator);
-    defer root.deinit(testing.allocator);
-
-    const expected = Raw{
-        .inner = .{
-            .sphere = .{
-                .radius = 0.4,
-                .center = .{ -1, -1.5, 3.5 },
-            },
-        },
-        .material = .{
-            .anon = .{
-                .typ = .flat,
-                .color = .{ .r = 42, .g = 201, .b = 51 },
-            },
-        },
-    };
-    const actual = try Raw.fromXml(root.firstChildElement("object").?);
-    try testing.expectEqualDeep(expected.inner, actual.inner);
-    try testing.expectEqualDeep(expected.material, actual.material);
-}
-
-test "fromXml: sphere with nammed material" {
-    const str =
-        \\ <root>
-        \\    <object type="sphere" radius="0.4" center="-1 -1.5 3.5" material="green" />
-        \\ </root>
-    ;
-    var root = try xml.parse(str, testing.allocator);
-    defer root.deinit(testing.allocator);
-
-    const expected = Object.Raw{
-        .inner = .{
-            .sphere = .{
-                .radius = 0.4,
-                .center = .{ -1.0, -1.5, 3.5 },
-            },
-        },
-        .material = .{ .name = "green" },
-    };
-    const actual = try Object.Raw.fromXml(root.firstChildElement("object").?);
-    try testing.expectEqualDeep(expected.inner, actual.inner);
-    try testing.expectEqualDeep(expected.material, actual.material);
-}
-
-test "fromXml: triangle" {
-    const str =
-        \\ <root>
-        \\    <object type="triangle" v1="1 2 3" v2="4 5 6" v3="7 8 9" />
-        \\ </root>
-    ;
-    var root = try xml.parse(str, testing.allocator);
-    defer root.deinit(testing.allocator);
-
-    const expected = Raw{
-        .inner = .{
-            .triangle = .{
-                .v1 = .{ 1, 2, 3 },
-                .v2 = .{ 4, 5, 6 },
-                .v3 = .{ 7, 8, 9 },
-            },
-        },
-        .material = null,
-    };
-    const actual = try Raw.fromXml(root.firstChildElement("object").?);
-    try testing.expectEqualDeep(expected.inner, actual.inner);
-    try testing.expectEqualDeep(expected.material, actual.material);
-}

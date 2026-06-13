@@ -3,68 +3,59 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Io = std.Io;
 
-const xml = @import("xml");
-
+const pre = @import("pre");
 const Scene = @import("Scene.zig");
 const World = @import("World.zig");
 
 const RT3 = @This();
 
-scenes: Scenes = .{},
+scene: Scene = .{},
 world: World = .{},
 
-/// Deallocates the memory allocated by `self`.
+pub const Raw = struct {
+    scene: Scene = .{},
+    world: World.Raw = .{},
+
+    pub fn intoInternal(self: @This(), gpa: Allocator) !RT3 {
+        var rt: RT3 = .{};
+        errdefer rt.deinit(gpa);
+        rt.scene = self.scene;
+        rt.world = try self.world.intoInternal(gpa);
+        return rt;
+    }
+};
+
 pub fn deinit(self: *RT3, gpa: Allocator) void {
-    self.scenes.deinit(gpa);
     self.world.deinit(gpa);
 }
 
-/// Constructs the ray tracer from a xml file specification.
-pub fn fromXmlFile(gpa: Allocator, io: Io, file: Io.File) !RT3 {
-    const md = try file.stat(io);
-    const mmap = try std.posix.mmap(null, md.size, .{ .READ = true }, .{ .TYPE = .PRIVATE }, file.handle, 0);
-    defer std.posix.munmap(mmap);
+pub fn fromZonFile(gpa: Allocator, io: Io, dir: Io.Dir, path: []const u8) !RT3 {
+    const source = try pre.process(gpa, io, dir, path);
+    defer gpa.free(source);
 
-    var root = try xml.parse(mmap, gpa);
-    defer root.deinit(gpa);
+    var diag: std.zon.parse.Diagnostics = .{};
+    defer diag.deinit(gpa);
 
-    return .fromXml(gpa, &root);
-}
+    const parsed = std.zon.parse.fromSliceAlloc(Raw, gpa, source, &diag, .{}) catch |err| {
+        var errors = diag.iterateErrors();
+        while (errors.next()) |e| {
+            const loc = e.getLocation(&diag);
+            const msg = e.fmtMessage(&diag);
+            std.log.err("in {s}:{d}:{d}: {f}\n", .{ path, loc.line + 1, loc.column + 1, msg });
 
-/// Constructs the ray tracer from a xml element.
-pub fn fromXml(gpa: Allocator, root: *const xml.Element) !RT3 {
-    var rt: RT3 = .{};
-    errdefer rt.deinit(gpa);
-    const options = .{
-        .scene = &rt.scenes,
-        .world = &rt.world,
-    };
-    if (try xml.parseElemValues(gpa, options, root)) |unknowns| {
-        const keys_str = comptime xml.fieldKeysStr(@TypeOf(options));
-        for (unknowns.items) |u| {
-            std.log.err("unrecognized option '{s}', expected one of {s}", .{ u, keys_str });
+            var notes = e.iterateNotes(&diag);
+            while (notes.next()) |note| {
+                const note_loc = note.getLocation(&diag);
+                const note_msg = note.fmtMessage(&diag);
+                std.log.info("in {s}:{d}:{d}: {f}\n", .{ path, note_loc.line + 1, note_loc.column + 1, note_msg });
+            }
         }
-        return error.UnrecognizedOption;
-    }
-    return rt;
+        return err;
+    };
+    return try parsed.intoInternal(gpa);
 }
 
-/// Render all the scenes defined by the ray tracer.
-pub fn renderAll(self: *const RT3, gpa: Allocator, io: Io, dir: Io.Dir) !void {
+pub fn render(self: *RT3, gpa: Allocator, io: Io, dir: Io.Dir) !void {
     errdefer std.log.err("an error occured while rendering", .{});
-    for (self.scenes.list.items) |*s| {
-        try s.render(gpa, io, dir, &self.world);
-    }
+    try self.scene.render(gpa, io, dir, &self.world);
 }
-
-const Scenes = struct {
-    list: ArrayList(Scene) = .empty,
-
-    fn deinit(self: *Scenes, gpa: Allocator) void {
-        self.list.deinit(gpa);
-    }
-
-    pub fn addFromXml(self: *Scenes, gpa: Allocator, elem: *const xml.Element) !void {
-        try self.list.append(gpa, try .fromXml(gpa, elem));
-    }
-};

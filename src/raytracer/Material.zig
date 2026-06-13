@@ -1,59 +1,46 @@
-const xml = @import("xml");
 const std = @import("std");
 const eql = std.mem.eql;
 
-const img = @import("img.zig");
-const Color = img.Color;
+const Color = @import("Color.zig");
 
 const Material = @This();
 
-color: Color = .{},
-typ: Type = .flat,
+tag: Tag = .flat,
+common: Common = .{},
 
 const log = std.log.scoped(.material);
 
-pub fn fromXml(elem: *const xml.Element) !@This() {
-    var ret = @This(){};
-
-    const typ = elem.queryAttribute("type", null) orelse
-        return error.ExpectedMaterialType;
-
-    if (eql(u8, typ, "flat")) {
-        ret.typ = .flat;
-    }
-
-    if (elem.queryAttribute("color", null)) |v| {
-        ret.color = try .fromStr(v);
-    }
-
-    return ret;
-}
-
-pub const Type = enum {
+pub const Tag = enum {
     flat,
-
-    pub fn fromStr(str: []const u8) !@This() {
-        if (eql(u8, str, "flat")) return .flat;
-        log.err("exepected one of ['flat'], found '{s}'", .{str});
-        return error.InvalidMaterialType;
-    }
+    blinn,
 };
 
-const testing = std.testing;
+pub const Common = struct {
+    color: Color = .{},
+    extra_idx: u32 = 0,
+};
 
-test "from xml" {
-    const str =
-        \\ <root>
-        \\      <material type="flat" color="0.95 0.05 0.05"/>
-        \\ </root>
-    ;
-    var root = try xml.parse(str, testing.allocator);
-    defer root.deinit(testing.allocator);
+pub const Flat = struct {};
 
-    const expected = Material{
-        .color = .{ .r = 242, .b = 12, .g = 12 },
-        .typ = .flat,
-    };
-    const actual = Material.fromXml(root.firstChildElement("material").?);
-    try testing.expectEqualDeep(expected, actual);
-}
+pub const Blinn = struct {
+    ambient: [3]f32,
+    diffuse: [3]f32,
+    specular: [3]f32,
+    glossiness: f32,
+};
+
+pub const Raw = struct {
+    name: []const u8,
+    inner: union(Tag) {
+        flat: struct {},
+        blinn: Blinn,
+    },
+    color: Color.Raw,
+
+    pub fn intoInternal(self: @This()) !Material {
+        return .{
+            .tag = self.inner,
+            .common = .{ .color = try self.color.intoInternal() },
+        };
+    }
+};

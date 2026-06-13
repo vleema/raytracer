@@ -4,8 +4,6 @@ const testing = std.testing;
 
 const vec = @import("vec");
 const Real = vec.Real;
-const xml = @import("xml");
-
 const Film = @import("Film.zig");
 const Frame = @import("Look.zig").Frame;
 const Ray = @import("Ray.zig");
@@ -46,39 +44,6 @@ pub const Camera = union(enum) {
             .rectangular => |r| r.generateRay(ix, iy, w, h, frame),
             .spherical => |s| s.generateRay(ix, iy, w, h, frame),
         };
-    }
-
-    pub fn fromXml(elem: *const xml.Element) !@This() {
-        const eql = std.mem.eql;
-        const typ = elem.queryAttribute("type", null) orelse
-            return error.ExpectedCameranType;
-
-        if (eql(u8, typ, "orthographic")) {
-            var cam: @This() = .{ .rectangular = .{ .orthographic = .{} } };
-            const sw_val = elem.queryAttribute("screen_window", null) orelse return cam;
-            const sw = try xml.parseFloatArray(f32, 4, sw_val);
-            cam.rectangular.orthographic = .{ .left = sw[0], .right = sw[1], .bottom = sw[2], .top = sw[3] };
-            return cam;
-        }
-        if (eql(u8, typ, "perspective")) {
-            var cam: @This() = .{ .rectangular = .{ .perspective = .{} } };
-            const fovy = elem.queryAttribute("fovy", null) orelse return cam;
-            cam.rectangular.perspective.fovy = try std.fmt.parseUnsigned(u32, fovy, 10);
-            return cam;
-        }
-        if (eql(u8, typ, "spherical")) {
-            const variant = elem.queryAttribute("variant", null) orelse return error.ExpectedSphericalVariant;
-            if (eql(u8, variant, "equirectangular")) {
-                return .{ .spherical = .equirectangular };
-            }
-            if (eql(u8, variant, "equal_area")) {
-                return .{ .spherical = .equal_area };
-            }
-            log.err("expected one of ['equirectangular', 'equal_area'], found {s}", .{variant});
-            return error.InvalidSphericalVariant;
-        }
-        log.err("expected one of ['perspective', 'orthographic', 'spherical'], found {s}", .{typ});
-        return error.InvalidCameraType;
     }
 };
 
@@ -252,7 +217,6 @@ test "spherical: origin is always frame origin" {
 test "equirectangular: top row maps to north pole" {
     const cam: Camera = .{ .spherical = .equirectangular };
     const film = Film{ .width = 4, .height = 4 };
-    // theta = pi * 0/4 = 0 -> sin=0, cos=1 -> {0, 0, 1} for any phi.
     const ray = cam.generateRay(2, 0, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }

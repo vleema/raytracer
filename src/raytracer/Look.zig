@@ -1,6 +1,7 @@
 const std = @import("std");
 const vec = @import("vec");
-const xml = @import("xml");
+
+const Look = @This();
 
 from: @Vector(3, f32) = .{ 0, 0, -7 },
 at: @Vector(3, f32) = .{ 0, 0, 0 },
@@ -26,24 +27,16 @@ pub fn normalFrame(self: @This()) Frame {
     };
 }
 
-pub fn fromXml(elem: *const xml.Element) !@This() {
-    var ret = @This(){};
-    const cb = struct {
-        fn call(val: []const u8) anyerror!f32 {
-            const i = try std.fmt.parseInt(i32, val, 10);
-            return @floatFromInt(i);
-        }
-    }.call;
+pub const Raw = struct {
+    from: [3]f32 = .{ 0, 0, -7 },
+    at: [3]f32 = .{ 0, 0, 0 },
+    up: [3]f32 = .{ 0, 1, 0 },
 
-    if (elem.queryAttribute("look_from", null)) |v| {
-        ret.from = try xml.parseArray(f32, 3, cb, v);
+    pub fn intoInternal(self: @This()) Look {
+        return .{
+            .from = self.from,
+            .at = self.at,
+            .up = self.up,
+        };
     }
-    if (elem.queryAttribute("look_at", null)) |v| {
-        ret.at = try xml.parseArray(f32, 3, cb, v);
-    }
-    if (elem.queryAttribute("up", null)) |v| {
-        ret.up = try xml.parseArray(f32, 3, cb, v);
-    }
-
-    return ret;
-}
+};

@@ -1,17 +1,19 @@
 const std = @import("std");
+
 const raytracer = @import("raytracer.zig");
 
-// TODO: Implement utilities for cmdline arg parsing.
+// TODO: Implement utilities for specifying raytracer options.
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena;
     const allocator = arena.allocator();
     const io = init.io;
 
-    const scene_file = try std.Io.Dir.cwd().openFile(io, "scene.xml", .{});
-    defer scene_file.close(io);
-
-    const rt = try raytracer.RT3.fromXmlFile(allocator, io, scene_file);
-    try rt.renderAll(allocator, io, std.Io.Dir.cwd());
+    const cwd = std.Io.Dir.cwd();
+    var rt = raytracer.RT3.fromZonFile(allocator, io, cwd, "scene.zon") catch |err| {
+        std.log.err("unable to parse scene description: {any}", .{err});
+        std.process.exit(1);
+    };
+    try rt.render(allocator, io, cwd);
 }
 
 test {
