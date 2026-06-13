@@ -3,12 +3,10 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
 const eql = std.mem.eql;
-const testing = std.testing;
 
 const Color = @import("Color.zig");
 const lerp = @import("lerp.zig");
 const Light = @import("Light.zig");
-const Ambient = Light.Ambient;
 const Point = Light.Point;
 const Directional = Light.Directional;
 const Material = @import("Material.zig");
@@ -25,8 +23,6 @@ background: Background = .{ .single_color = .{} },
 materials: Materials = .{},
 objects: Objects = .{},
 lights: Lights = .{},
-
-const log = std.log.scoped(.world);
 
 pub fn deinit(self: *@This(), gpa: Allocator) void {
     self.objects.deinit(gpa);
@@ -141,6 +137,7 @@ const Objects = struct {
         }
 
         for (raw_objs) |raw| {
+            // SAFETY: `idx` is initialized by the switch below.
             var idx: u32 = undefined;
             switch (raw.inner) {
                 .sphere => |s| {

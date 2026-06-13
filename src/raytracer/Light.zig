@@ -1,7 +1,3 @@
-const std = @import("std");
-
-const log = std.log.scoped(.light);
-
 tag: Tag,
 common: Common,
 

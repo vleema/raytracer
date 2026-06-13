@@ -1,7 +1,6 @@
 const std = @import("std");
 const math = std.math;
 
-const arr = @import("arr");
 const vec = @import("vec");
 const Real = vec.Real;
 
@@ -28,8 +27,6 @@ pub const Raw = union(enum) {
         };
     }
 };
-
-const color_log = std.log.scoped(.color);
 
 pub fn fromHex(str: ?[]const u8) !@This() {
     if (str == null or str.?.len == 0) return .{};

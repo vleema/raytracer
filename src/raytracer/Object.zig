@@ -1,15 +1,7 @@
-const std = @import("std");
-const testing = std.testing;
-
 const vec = @import("vec");
 const Real = vec.Real;
 
-const Material = @import("Material.zig");
 const Ray = @import("Ray.zig");
-
-const Object = @This();
-
-const log = std.log.scoped(.object);
 
 tag: Tag,
 common: Common,

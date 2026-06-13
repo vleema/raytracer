@@ -1,9 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
 const Io = std.Io;
 
 const pre = @import("pre");
+
 const Scene = @import("Scene.zig");
 const World = @import("World.zig");
 

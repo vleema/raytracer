@@ -8,8 +8,6 @@ const Film = @import("Film.zig");
 const Frame = @import("Look.zig").Frame;
 const Ray = @import("Ray.zig");
 
-const log = std.log.scoped(.camera);
-
 pub const Camera = union(enum) {
     spherical: Spherical,
     rectangular: Rectangular,

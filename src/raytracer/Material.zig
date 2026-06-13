@@ -1,14 +1,9 @@
-const std = @import("std");
-const eql = std.mem.eql;
-
 const Color = @import("Color.zig");
 
 const Material = @This();
 
 tag: Tag = .flat,
 common: Common = .{},
-
-const log = std.log.scoped(.material);
 
 pub const Tag = enum {
     flat,
