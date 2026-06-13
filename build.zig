@@ -53,6 +53,7 @@ pub fn build(b: *std.Build) void {
     const libs = &.{
         .{ .name = "vec", .path = "lib/vec.zig" },
         .{ .name = "xml", .path = "lib/xml.zig" },
+        .{ .name = "pre", .path = "lib/pre.zig" },
         .{ .name = "ppm", .path = "lib/ppm.zig" },
         .{ .name = "png", .path = "lib/png.zig" },
     };
