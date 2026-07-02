@@ -7,6 +7,7 @@ const Real = vec.Real;
 const Camera = @import("Camera.zig").Camera;
 const Color = @import("Color.zig");
 const Frame = @import("Look.zig").Frame;
+const Light = @import("Light.zig");
 const Material = @import("Material.zig");
 const Object = @import("Object.zig");
 const Ray = @import("Ray.zig");
@@ -30,9 +31,10 @@ pub const Integrator = union(enum) {
         for (0..height) |y| {
             for (0..width) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);
-                const color = if (world.objHit(&ray)) |v|
+                const color = if (world.objHit(&ray, std.math.inf(f32))) |v|
                     self.li(world, ray, v.hit, v.material)
                 else
+                    // TODO: Add texture background.
                     world.background.ptColor(
                         width,
                         height,
@@ -60,9 +62,9 @@ pub const Integrator = union(enum) {
 
 pub const Flat = struct {
     pub fn li(
-        _: *const World,
-        _: Ray,
-        _: Object.Hit,
+        _: anytype,
+        _: anytype,
+        _: anytype,
         material: Material,
     ) Color {
         return material.common.color;
@@ -79,48 +81,80 @@ pub const Blinn = struct {
         if (material.tag != .blinn) return material.common.color;
         const blinn = world.materials.blinn.items[material.common.extra_idx];
 
-        const normal: Real(3) = hit.normal;
         const view: Real(3) = -@as(Real(3), ray.direction);
         const hit_pt = ray.at(hit.t);
+        const dist = vec.len(3, f32, vec.sub(3, f32, hit_pt, ray.origin));
 
-        var ambient: Real(3) = .{ 0, 0, 0 };
-        var lights: Real(3) = .{ 0, 0, 0 };
-
+        var light_contrib: Real(3) = .{ 0, 0, 0 };
         const slice = world.lights.list.slice();
         for (slice.items(.tag), slice.items(.common)) |tag, common| {
-            switch (tag) {
-                .ambient => {
-                    ambient += @as(Real(3), blinn.ambient) *
-                        @as(Real(3), common.scale) *
-                        @as(Real(3), common.intensity);
-                },
-                .directional, .point => {
-                    const light = switch (tag) {
-                        .directional => blk: {
-                            const directional = world.lights.directional.items[common.extra_idx];
-                            break :blk vec.normalize(3, f32, vec.sub(3, f32, directional.from, directional.to));
-                        },
-                        .point => blk: {
-                            const point = world.lights.point.items[common.extra_idx];
-                            break :blk vec.normalize(3, f32, vec.sub(3, f32, point.from, hit_pt));
-                        },
-                        else => unreachable,
-                    };
-
-                    const half_vector = vec.normalize(3, f32, view + light);
-                    const n_dot_h = vec.dot(3, f32, normal, half_vector);
-                    const n_dot_l = vec.dot(3, f32, normal, light);
-                    const intensity = vec.mul(3, f32, common.intensity, common.scale);
-
-                    lights += intensity * vec.mul_scalar(3, f32, @max(0, n_dot_l), blinn.diffuse);
-                    lights += intensity * vec.mul_scalar(3, f32, math.pow(f32, @max(0, n_dot_h), blinn.glossiness), blinn.specular);
-                },
-            }
+            const light: Light = .{ .common = common, .tag = tag };
+            light_contrib += lightContrib(world, light, view, hit.normal, hit_pt, dist, blinn);
         }
-
-        const total = ambient + lights;
         const base = Color.toReal(material.common.color);
+        return .fromReal(base * light_contrib);
+    }
 
-        return .fromReal(base * total);
+    fn lightContrib(
+        world: *const World,
+        light: Light,
+        view: Real(3),
+        normal: Real(3),
+        hit_pt: [3]f32,
+        dist: f32,
+        material: Material.Blinn,
+    ) Real(3) {
+        const light_dir, const intensity, const attenuated, const shadow_max =
+            switch (light.tag) {
+                .ambient => return vec.mul(3, f32, .{
+                    material.ambient,
+                    light.common.intensity,
+                }),
+                // TODO: Use shadow ray as bounding box of objects.
+                .directional => blk: {
+                    const payload = world.lights.directional.items[light.common.extra_idx];
+                    const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, payload.to));
+                    break :blk .{ light_dir, light.common.intensity, material, 50 };
+                },
+                .point => blk: {
+                    const payload = world.lights.point.items[light.common.extra_idx];
+                    const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, hit_pt));
+                    break :blk .{
+                        light_dir,
+                        light.common.intensity,
+                        light.common.attenuate(&material, dist),
+                        std.math.inf(f32),
+                    };
+                },
+                .spotlight => blk: {
+                    const payload = world.lights.spotlight.items[light.common.extra_idx];
+                    const opposite = vec.normalize(3, f32, vec.sub(3, f32, payload.from, payload.to));
+                    const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, hit_pt));
+                    const theta = vec.dot(3, f32, light_dir, opposite);
+                    const eps = payload.cutoff - payload.falloff;
+                    const intensity = math.clamp((theta - payload.falloff) / eps, 0.0, 1.0);
+                    break :blk .{
+                        light_dir,
+                        @as(Real(3), @splat(intensity)),
+                        light.common.attenuate(&material, dist),
+                        std.math.inf(f32),
+                    };
+                },
+            };
+
+        const shadow_offset: Real(3) = .{ 0.0001, 0.0001, 0.0001 };
+        const shadow_ray = Ray{ .origin = hit_pt + shadow_offset, .direction = light_dir };
+        if (world.objHit(&shadow_ray, shadow_max)) |_| return @splat(0);
+
+        const glossiness = attenuated.glossiness;
+        const specular = attenuated.specular;
+        const diffuse = attenuated.diffuse;
+
+        const half_vector = vec.normalize(3, f32, view + light_dir);
+        const n_dot_h = vec.dot(3, f32, normal, half_vector);
+        const n_dot_l = vec.dot(3, f32, normal, light_dir);
+
+        return intensity * vec.mul_scalar(3, f32, @max(0, n_dot_l), diffuse) +
+            intensity * vec.mul_scalar(3, f32, math.pow(f32, @max(0, n_dot_h), glossiness), specular);
     }
 };

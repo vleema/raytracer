@@ -6,16 +6,20 @@ pub fn Real(N: comptime_int) type {
     return @Vector(N, f32);
 }
 
+/// Calculates the length of the vector.
+pub fn len(N: comptime_int, T: type, vec: @Vector(N, T)) T {
+    return @sqrt(@reduce(.Add, vec * vec));
+}
+
 /// Normalizes a vector, i.e. divides is elements by it's size and returns the resulting vector.
 pub fn normalize(
     N: comptime_int,
     T: type,
     vec: @Vector(N, T),
 ) @Vector(N, T) {
-    const len_sq = @reduce(.Add, vec * vec);
-    const len = @sqrt(len_sq);
-    if (len == 0.0) return .{ 0, 0, 0 };
-    return vec / @as(@Vector(N, T), @splat(len));
+    const l = len(N, T, vec);
+    if (l == 0.0) return .{ 0, 0, 0 };
+    return vec / @as(@Vector(N, T), @splat(l));
 }
 
 /// Executes a cross product in two 3 dimensional vectors.
@@ -50,10 +54,11 @@ pub fn dot(
 pub fn add(
     N: comptime_int,
     T: type,
-    u: @Vector(N, T),
-    v: @Vector(N, T),
+    args: anytype,
 ) @Vector(N, T) {
-    return u + v;
+    var result: @Vector(N, T) = @splat(1);
+    inline for (args) |arg| result = result + arg;
+    return result;
 }
 
 /// Wrapper for @Vector(N, T) (-).
@@ -67,13 +72,10 @@ pub fn sub(
 }
 
 /// Wrapper for @Vector(N, T) (*).
-pub fn mul(
-    N: comptime_int,
-    T: type,
-    u: @Vector(N, T),
-    v: @Vector(N, T),
-) @Vector(N, T) {
-    return u * v;
+pub fn mul(N: comptime_int, T: type, args: anytype) @Vector(N, T) {
+    var result: @Vector(N, T) = @splat(1);
+    inline for (args) |arg| result = result * arg;
+    return result;
 }
 
 /// Helper for calculating scalar multiplication.
@@ -105,6 +107,11 @@ pub fn sphericalTheta(w: Real(3)) f32 {
 pub fn sphericalPhi(w: Real(3)) f32 {
     const phi = math.atan2(w[1], w[0]);
     return if (phi < 0) phi + 2 * math.pi else phi;
+}
+
+/// Converts a angle to radian value.
+pub fn angleToRad(n: f32) f32 {
+    return n * math.pi / 180;
 }
 
 const testing = std.testing;

@@ -4,6 +4,7 @@ const testing = std.testing;
 
 const vec = @import("vec");
 const Real = vec.Real;
+
 const Film = @import("Film.zig");
 const Frame = @import("Look.zig").Frame;
 const Ray = @import("Ray.zig");

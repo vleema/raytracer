@@ -1,4 +1,5 @@
 const std = @import("std");
+const vec = @import("vec");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
@@ -9,6 +10,7 @@ const lerp = @import("lerp.zig");
 const Light = @import("Light.zig");
 const Point = Light.Point;
 const Directional = Light.Directional;
+const Spotlight = Light.Spotlight;
 const Material = @import("Material.zig");
 const Blinn = Material.Blinn;
 const Object = @import("Object.zig");
@@ -30,9 +32,9 @@ pub fn deinit(self: *@This(), gpa: Allocator) void {
     self.lights.deinit(gpa);
 }
 
-pub fn objHit(self: *const World, r: *const Ray) ?struct { hit: Object.Hit, material: Material } {
+pub fn objHit(self: *const World, r: *const Ray, max_dist: f32) ?struct { hit: Object.Hit, material: Material } {
     const tmin = 0;
-    var tmax = std.math.inf(f32);
+    var tmax = max_dist;
     var closest_hit: ?Object.Hit = null;
     var material: ?Material = null;
 
@@ -167,11 +169,13 @@ const Lights = struct {
     list: MultiArrayList(Light) = .empty,
     directional: ArrayList(Directional) = .empty,
     point: ArrayList(Point) = .empty,
+    spotlight: ArrayList(Spotlight) = .empty,
 
     fn deinit(self: *Lights, gpa: Allocator) void {
         self.list.deinit(gpa);
         self.directional.deinit(gpa);
         self.point.deinit(gpa);
+        self.spotlight.deinit(gpa);
     }
 
     fn fromRawList(gpa: Allocator, raw_lights: []const Light.Raw) !Lights {
@@ -179,22 +183,30 @@ const Lights = struct {
         errdefer this.deinit(gpa);
 
         for (raw_lights) |raw| {
-            var item = raw;
-            switch (item.inner) {
+            // SAFETY: `extra_idx` is defined by the switch below.
+            var extra_idx: u32 = undefined;
+            switch (raw.inner) {
                 .ambient => {},
                 .directional => |d| {
-                    item.common.extra_idx = @intCast(this.directional.items.len);
+                    extra_idx = @intCast(this.directional.items.len);
                     try this.directional.append(gpa, d);
                 },
                 .point => |p| {
-                    item.common.extra_idx = @intCast(this.point.items.len);
+                    extra_idx = @intCast(this.point.items.len);
                     try this.point.append(gpa, p);
                 },
+                .spotlight => |p| {
+                    var l = p;
+                    l.cutoff = @cos(vec.angleToRad(p.cutoff));
+                    l.falloff = @cos(vec.angleToRad(p.falloff));
+                    extra_idx = @intCast(this.point.items.len);
+                    try this.spotlight.append(gpa, l);
+                },
             }
-            try this.list.append(gpa, .{
-                .tag = @as(Light.Tag, item.inner),
-                .common = item.common,
-            });
+
+            var item = try raw.intoInternal();
+            item.common.extra_idx = extra_idx;
+            try this.list.append(gpa, item);
         }
         return this;
     }

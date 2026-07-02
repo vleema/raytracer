@@ -1,4 +1,7 @@
+const vec = @import("vec");
+
 const Color = @import("Color.zig");
+const Light = @import("Light.zig");
 
 const Material = @This();
 
@@ -22,6 +25,20 @@ pub const Blinn = struct {
     diffuse: [3]f32,
     specular: [3]f32,
     glossiness: f32,
+
+    pub fn attenuate(
+        self: *const Blinn,
+        attenuation: Light.Common.Attenuation,
+        dist: f32,
+    ) @This() {
+        const val = attenuation.val(dist);
+        return .{
+            .ambient = vec.mul_scalar(3, f32, val, self.ambient),
+            .diffuse = vec.mul_scalar(3, f32, val, self.diffuse),
+            .specular = vec.mul_scalar(3, f32, val, self.specular),
+            .glossiness = self.glossiness,
+        };
+    }
 };
 
 pub const Raw = struct {
