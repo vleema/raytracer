@@ -56,7 +56,7 @@ pub fn add(
     T: type,
     args: anytype,
 ) @Vector(N, T) {
-    var result: @Vector(N, T) = @splat(1);
+    var result: @Vector(N, T) = @splat(0);
     inline for (args) |arg| result = result + arg;
     return result;
 }
