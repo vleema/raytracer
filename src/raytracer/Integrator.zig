@@ -29,7 +29,7 @@ pub const Integrator = union(enum) {
         for (0..height) |y| {
             for (0..width) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);
-                const color = if (world.objHit(&ray, 0, std.math.inf(f32))) |v|
+                const color = if (world.objHit(&ray, std.math.inf(f32))) |v|
                     self.li(world, ray, v.hit, v.material, 0)
                 else
                     // TODO: Add texture background.
@@ -97,8 +97,9 @@ pub const Blinn = struct {
         if (depth < self.max_depth) {
             const direction = ray.direction -
                 vec.mul_scalar(3, f32, 2 * vec.dot(3, f32, ray.direction, hit.normal), hit.normal);
-            const reflected: Ray = .{ .direction = direction, .origin = hit_pt };
-            if (world.objHit(&reflected, 0.0001, math.inf(f32))) |h| {
+            const reflect_origin = hit_pt + @as(Real(3), @splat(0.001)) * hit.normal;
+            const reflected: Ray = .{ .direction = direction, .origin = reflect_origin };
+            if (world.objHit(&reflected, math.inf(f32))) |h| {
                 light_contrib += blinn.mirror * self.li(world, reflected, h.hit, h.material, depth + 1).toReal();
             }
         }
@@ -139,7 +140,7 @@ pub const Blinn = struct {
                         light_dir,
                         light.common.intensity,
                         light.common.attenuate(&material, light_dist),
-                        std.math.inf(f32),
+                        light_dist,
                     };
                 },
                 .spotlight => blk: {
@@ -154,13 +155,14 @@ pub const Blinn = struct {
                         light_dir,
                         @as(Real(3), @splat(intensity)),
                         light.common.attenuate(&material, light_dist),
-                        std.math.inf(f32),
+                        light_dist,
                     };
                 },
             };
 
-        const shadow_ray = Ray{ .origin = hit_pt, .direction = light_dir };
-        if (world.objHit(&shadow_ray, 0.0001, shadow_max)) |_| return @splat(0);
+        const shadow_origin = hit_pt + @as(Real(3), @splat(0.001)) * normal;
+        const shadow_ray = Ray{ .origin = shadow_origin, .direction = light_dir };
+        if (world.objHit(&shadow_ray, shadow_max)) |_| return @splat(0);
 
         const glossiness = attenuated.glossiness;
         const specular = attenuated.specular;

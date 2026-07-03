@@ -35,9 +35,9 @@ pub fn deinit(self: *@This(), gpa: Allocator) void {
 pub fn objHit(
     self: *const World,
     r: *const Ray,
-    min_dist: f32,
     max_dist: f32,
 ) ?struct { hit: Object.Hit, material: Material } {
+    const tmin = 0;
     var tmax = max_dist;
     var closest_hit: ?Object.Hit = null;
     var material: ?Material = null;
@@ -47,9 +47,9 @@ pub fn objHit(
     const commons = slice.items(.common);
     for (tags, commons, self.objects.materials.items) |t, c, m| {
         const hit = switch (t) {
-            .sphere => self.objects.spheres.items[c.extra_idx].hit(r, min_dist, tmax),
-            .triangle => self.objects.triangles.items[c.extra_idx].hit(r, min_dist, tmax),
-            .plane => self.objects.planes.items[c.extra_idx].hit(r, min_dist, tmax),
+            .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
+            .triangle => self.objects.triangles.items[c.extra_idx].hit(r, tmin, tmax),
+            .plane => self.objects.planes.items[c.extra_idx].hit(r, tmin, tmax),
         };
         if (hit) |h| {
             closest_hit = h;
