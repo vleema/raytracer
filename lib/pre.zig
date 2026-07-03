@@ -58,13 +58,14 @@ fn resolveIncludes(
                 if (included.contains(resolved))
                     return error.CircularInclude;
 
-                try out.appendSlice(gpa, sourceZ[pos..tok.loc.start]);
+                try out.appendSlice(gpa, sourceZ[pos .. tok.loc.start - 1]);
                 try included.put(resolved, {});
 
                 const included_source = try dir.readFileAlloc(io, resolved, gpa, .unlimited);
                 defer gpa.free(included_source);
 
-                try resolveIncludes(gpa, io, dir, included, out, included_source, resolved);
+                const unwrapped = try unwrapStructLiteral(gpa, included_source);
+                try resolveIncludes(gpa, io, dir, included, out, unwrapped, resolved);
 
                 pos = val_tok.loc.end;
                 tokenizer = p;
@@ -84,4 +85,46 @@ fn resolvePath(gpa: Allocator, source_path: []const u8, include_path: []const u8
     }
     const dirname = std.fs.path.dirname(source_path) orelse ".";
     return std.fs.path.join(gpa, &.{ dirname, include_path });
+}
+
+/// Strips the outer .{ ... } wrapper from a zon struct literal.
+/// Returns a slice of the original source with just the inner content.
+fn unwrapStructLiteral(gpa: Allocator, source: []const u8) ![]const u8 {
+    const sourceZ = try gpa.dupeSentinel(u8, source, 0);
+    defer gpa.free(sourceZ);
+
+    var tokenizer = std.zig.Tokenizer.init(sourceZ);
+
+    while (true) {
+        const tok = tokenizer.next();
+        switch (tok.tag) {
+            .period => break,
+            .doc_comment, .container_doc_comment => continue,
+            else => return source,
+        }
+    }
+
+    var tok = tokenizer.next();
+    const start = tok.loc.end;
+    if (tok.tag != .l_brace) return source;
+
+    var peek = tokenizer;
+    var peek_tok = peek.next();
+    var depth: usize = 1;
+    while (depth > 0) : (peek_tok = peek.next()) {
+        switch (peek_tok.tag) {
+            .l_brace => depth += 1,
+            .r_brace => {
+                depth -= 1;
+                if (depth == 0) break;
+            },
+            .eof => return error.UnmatchedBrace,
+            else => {},
+        }
+        tok = tokenizer.next();
+    }
+    return if (tok.tag == .comma)
+        source[start..tok.loc.start]
+    else
+        source[start..peek_tok.loc.start];
 }
