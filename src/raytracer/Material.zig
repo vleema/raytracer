@@ -24,6 +24,7 @@ pub const Blinn = struct {
     ambient: [3]f32,
     diffuse: [3]f32,
     specular: [3]f32,
+    mirror: [3]f32,
     glossiness: f32,
 
     pub fn attenuate(
@@ -36,6 +37,7 @@ pub const Blinn = struct {
             .ambient = vec.mul_scalar(3, f32, val, self.ambient),
             .diffuse = vec.mul_scalar(3, f32, val, self.diffuse),
             .specular = vec.mul_scalar(3, f32, val, self.specular),
+            .mirror = self.mirror,
             .glossiness = self.glossiness,
         };
     }

@@ -40,6 +40,7 @@ pub const Common = struct {
             .ambient = vec.mul_scalar(3, f32, val, material.ambient),
             .diffuse = vec.mul_scalar(3, f32, val, material.diffuse),
             .specular = vec.mul_scalar(3, f32, val, material.specular),
+            .mirror = material.mirror,
             .glossiness = material.glossiness,
         };
     }
