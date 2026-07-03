@@ -1,0 +1,395 @@
+.{
+    // Top row spheres: specular variation
+    .{
+        .name = "spec_0",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_2",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 2,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_4",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 4,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_8",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 8,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_16",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 16,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_32",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 32,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_64",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 64,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_128",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 128,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_256",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 256,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    .{
+        .name = "spec_512",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.5, 0.5, 0.5 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 512,
+                .mirror = .{ 0, 0, 0 },
+            },
+        },
+        .color = .{ .hex = "#727272" },
+    },
+    // Middle row spheres: mirror variation
+    .{
+        .name = "mirror_0",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.1, 0.1, 0.1 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_2",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.2, 0.2, 0.2 },
+            },
+        },
+        .color = .{ .hex = "#673aa4" },
+    },
+    .{
+        .name = "mirror_4",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.3, 0.3, 0.3 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_8",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.4, 0.4, 0.4 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_16",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.5, 0.5, 0.5 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_32",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.6, 0.6, 0.6 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_64",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.7, 0.7, 0.7 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_128",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.8, 0.8, 0.8 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_256",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.9, 0.9, 0.9 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    .{
+        .name = "mirror_512",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 0.46, 0.26, 0.73 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 1.0, 1.0, 1.0 },
+            },
+        },
+        .color = .{ .hex = "#63389d" },
+    },
+    // Bottom row spheres: combining mirror/specular variation
+    .{
+        .name = "mix_0",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 0,
+                .mirror = .{ 0.1, 0.1, 0.1 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_2",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 2,
+                .mirror = .{ 0.2, 0.2, 0.2 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_4",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 4,
+                .mirror = .{ 0.3, 0.3, 0.3 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_8",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 8,
+                .mirror = .{ 0.4, 0.4, 0.4 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_16",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 16,
+                .mirror = .{ 0.5, 0.5, 0.5 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_32",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 32,
+                .mirror = .{ 0.6, 0.6, 0.6 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_64",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 64,
+                .mirror = .{ 0.7, 0.7, 0.7 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_128",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 128,
+                .mirror = .{ 0.8, 0.8, 0.8 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_256",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 256,
+                .mirror = .{ 0.9, 0.9, 0.9 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+    .{
+        .name = "mix_512",
+        .inner = .{
+            .blinn = .{
+                .ambient = .{ 0.2, 0.2, 0.2 },
+                .diffuse = .{ 1.0, 0.16, 0 },
+                .specular = .{ 0.85, 0.62, 0.21 },
+                .glossiness = 512,
+                .mirror = .{ 1.0, 1.0, 1.0 },
+            },
+        },
+        .color = .{ .hex = "#dc2300" },
+    },
+}

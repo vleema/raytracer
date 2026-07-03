@@ -1,0 +1,197 @@
+.{
+    .scene = .{
+        .lookat = .{
+            .from = .{ -3, 5.5, -10 },
+            .at = .{ 0, 2, 1.01 },
+            .up = .{ 0, 1, 0 },
+        },
+        .camera = .{
+            .rectangular = .{ .perspective = .{ .fovy = 45 } },
+        },
+        .integrator = .{
+            .blinn = .{ .max_depth = 1 },
+        },
+        .film = .{
+            .tag = .image,
+            .width = 1920,
+            .height = 1200,
+            .filename = "spotlights.png",
+            .format = .png,
+            .gamma_corrected = false,
+        },
+    },
+    .world = .{
+        .background = .{
+            .four_colors = .{
+                .bl = .{ .rgb_u8 = .{ 176, 214, 175 } },
+                .tl = .{ .rgb_u8 = .{ 4, 99, 202 } },
+                .tr = .{ .rgb_u8 = .{ 4, 99, 202 } },
+                .br = .{ .rgb_u8 = .{ 176, 214, 175 } },
+            },
+        },
+        .lights = .{
+            .{
+                .inner = .{ .ambient = .{} },
+                .intensity = .{ 0.1, 0.1, 0.1 },
+                .scale = .{ 0.5, 0.5, 0.5 },
+            },
+            .{
+                .inner = .{
+                    .spotlight = .{
+                        .from = .{ -2, 8, 2 },
+                        .to = .{ -2, 2, 3 },
+                        .cutoff = 30,
+                        .falloff = 15,
+                    },
+                },
+                .intensity = .{ 0.9, 0.9, 0.9 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{
+                    .constant = 1,
+                    .linear = 0,
+                    .quadratic = 0,
+                },
+            },
+            .{
+                .inner = .{
+                    .spotlight = .{
+                        .from = .{ 2, 5, -1 },
+                        .to = .{ 2, 2, -2 },
+                        .cutoff = 25,
+                        .falloff = 25,
+                    },
+                },
+                .intensity = .{ 0.9, 0.9, 0.9 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{
+                    .constant = 1,
+                    .linear = 0,
+                    .quadratic = 0,
+                },
+            },
+            .{
+                .inner = .{
+                    .spotlight = .{
+                        .from = .{ 0, 7, -1 },
+                        .to = .{ 0, 2, 0 },
+                        .cutoff = 30,
+                        .falloff = 30,
+                    },
+                },
+                .intensity = .{ 0.9, 0.2, 0.2 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{
+                    .constant = 1,
+                    .linear = 0,
+                    .quadratic = 0,
+                },
+            },
+            .{
+                .inner = .{
+                    .spotlight = .{
+                        .from = .{ 15, 12, -2 },
+                        .to = .{ 3, 3, 7 },
+                        .cutoff = 15,
+                        .falloff = 5,
+                    },
+                },
+                .intensity = .{ 1.0, 0.65, 0.0 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{
+                    .constant = 1,
+                    .linear = 0,
+                    .quadratic = 0,
+                },
+            },
+        },
+        .materials = .{
+            .{
+                .name = "gold",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.4, 0.4, 0.4 },
+                        .diffuse = .{ 1, 0.65, 0.0 },
+                        .specular = .{ 0.8, 0.6, 0.2 },
+                        .glossiness = 256,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "grey",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.1, 0.1, 0.1 },
+                        .diffuse = .{ 0.7, 0.7, 0.7 },
+                        .specular = .{ 0, 0, 0 },
+                        .glossiness = 0,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "redish",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.6, 0.6, 0.6 },
+                        .diffuse = .{ 0.9, 0.2, 0.1 },
+                        .specular = .{ 0.8, 0.8, 0.8 },
+                        .glossiness = 64,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "greenish",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.6, 0.6, 0.6 },
+                        .diffuse = .{ 0.2, 0.9, 0.2 },
+                        .specular = .{ 0.8, 0.8, 0.8 },
+                        .glossiness = 256,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "blueish",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.6, 0.6, 0.6 },
+                        .diffuse = .{ 0.1, 0.2, 0.9 },
+                        .specular = .{ 0.8, 0.8, 0.8 },
+                        .glossiness = 16,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+        },
+        .objects = .{
+            .{
+                .inner = .{ .sphere = .{ .center = .{ 0, 1, 0 }, .radius = 1 } },
+                .material = "redish",
+            },
+            .{
+                .inner = .{ .sphere = .{ .center = .{ -2, 1, 3 }, .radius = 1 } },
+                .material = "greenish",
+            },
+            .{
+                .inner = .{ .sphere = .{ .center = .{ 2, 1, -2 }, .radius = 1 } },
+                .material = "blueish",
+            },
+            .{
+                .inner = .{ .sphere = .{ .center = .{ 3, 1.7, 7 }, .radius = 1.7 } },
+                .material = "gold",
+            },
+            .{
+                .inner = .{ .plane = .{ .pos = .{ 0, 0, 0 }, .dir = .{ 0, 1, 0 } } },
+                .material = "grey",
+            },
+        },
+    },
+}

@@ -1,0 +1,119 @@
+.{
+    .scene = .{
+        .lookat = .{
+            .from = .{ 0, 0, 0 },
+            .at = .{ 0, 0, 10 },
+            .up = .{ 0, 1, 0 },
+        },
+        .camera = .{
+            .rectangular = .{ .perspective = .{ .fovy = 65 } },
+        },
+        .integrator = .{
+            .blinn = .{
+                .max_depth = 10,
+            },
+        },
+        .film = .{
+            .tag = .image,
+            .width = 1920,
+            .height = 1080,
+            .filename = "three_balls.png",
+            .format = .png,
+            .gamma_corrected = true,
+        },
+    },
+    .world = .{
+        .background = .{
+            .four_colors = .{
+                .bl = .{ .rgb_u8 = .{ 25, 30, 60 } },
+                .tl = .{ .rgb_u8 = .{ 10, 15, 40 } },
+                .tr = .{ .rgb_u8 = .{ 10, 15, 40 } },
+                .br = .{ .rgb_u8 = .{ 25, 30, 60 } },
+            },
+        },
+        .materials = .{
+            .{
+                .name = "ground",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.1, 0.1, 0.1 },
+                        .diffuse = .{ 0.5, 0.5, 0.5 },
+                        .specular = .{ 0.1, 0.1, 0.1 },
+                        .glossiness = 32,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "gold",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.2, 0.15, 0.05 },
+                        .diffuse = .{ 1.0, 0.65, 0.0 },
+                        .specular = .{ 0.8, 0.6, 0.2 },
+                        .glossiness = 256,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "red_shiny",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.1, 0.03, 0.03 },
+                        .diffuse = .{ 1.0, 0.15, 0.15 },
+                        .specular = .{ 0.7, 0.7, 0.7 },
+                        .glossiness = 128,
+                        .mirror = .{ 0, 0, 0 },
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+            .{
+                .name = "blue_matte",
+                .inner = .{
+                    .blinn = .{
+                        .ambient = .{ 0.03, 0.03, 0.15 },
+                        .diffuse = .{ 0.15, 0.15, 1.0 },
+                        .specular = .{ 0.0, 0.0, 0.0 },
+                        .mirror = .{ 0, 0, 0 },
+                        .glossiness = 1,
+                    },
+                },
+                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
+            },
+        },
+        .objects = .{
+            .{
+                .inner = .{ .plane = .{ .dir = .{ 0, 1, 0 }, .pos = .{ 0, -2, 12 } } },
+                .material = "ground",
+            },
+            .{
+                .inner = .{ .sphere = .{ .radius = 0.7, .center = .{ -1.5, -1.0, 5 } } },
+                .material = "gold",
+            },
+            .{
+                .inner = .{ .sphere = .{ .radius = 0.5, .center = .{ 1.3, -0.3, 8 } } },
+                .material = "red_shiny",
+            },
+            .{
+                .inner = .{ .sphere = .{ .radius = 0.5, .center = .{ -0.8, -0.8, 7 } } },
+                .material = "blue_matte",
+            },
+        },
+        .lights = .{
+            .{
+                .inner = .{ .ambient = .{} },
+                .intensity = .{ 0.1, 0.1, 0.12 },
+                .scale = .{ 1, 1, 1 },
+            },
+            .{
+                .inner = .{ .point = .{ .from = .{ 1, 2, 3 } } },
+                .intensity = .{ 1, 0.85, 0.6 },
+                .scale = .{ 1.0, 0.65, 0.65 },
+            },
+        },
+    },
+}

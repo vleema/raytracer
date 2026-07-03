@@ -1,0 +1,125 @@
+.{
+    // Top Row Objects
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -5, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_0",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -4, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_2",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -3, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_4",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -2, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_8",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -1, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_16",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 0, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_32",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 1, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_64",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 2, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_128",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 3, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_256",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 4, 1, 1 }, .radius = 0.4 } },
+        .material = "spec_512",
+    },
+    // Middle Row Objects
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -5, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_0",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -4, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_2",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -3, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_4",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -2, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_8",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -1, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_16",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 0, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_32",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 1, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_64",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 2, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_128",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 3, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_256",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 4, 0, 1 }, .radius = 0.4 } },
+        .material = "mirror_512",
+    },
+    // Bottom Row Objects
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -5, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_0",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -4, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_2",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -3, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_4",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -2, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_8",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ -1, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_16",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 0, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_32",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 1, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_64",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 2, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_128",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 3, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_256",
+    },
+    .{
+        .inner = .{ .sphere = .{ .center = .{ 4, -1, 1 }, .radius = 0.4 } },
+        .material = "mix_512",
+    },
+}
