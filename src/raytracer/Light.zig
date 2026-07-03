@@ -73,8 +73,8 @@ pub const Variant = union(Tag) {
 
 pub const Raw = struct {
     inner: Variant,
-    scale: [3]f32,
-    intensity: [3]f32,
+    scale: [3]f32 = .{ 1, 1, 1 },
+    intensity: [3]f32 = .{ 1, 1, 1 },
     attenuation: Common.Attenuation = .{
         .constant = 1,
         .linear = 0.09,
