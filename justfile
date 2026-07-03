@@ -20,8 +20,8 @@ build-release:
     zig build {{ release-mode }}
 
 # Builds and runs the program.
-run:
-    zig build run
+run scene="scene.zon":
+    zig build run -- {{ scene }}
 
 # Builds and runs the program in release mode.
 run-release:
