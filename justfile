@@ -24,8 +24,8 @@ run scene="scene.zon":
     zig build run -- {{ scene }}
 
 # Builds and runs the program in release mode.
-run-release:
-    zig build run {{ release-mode }}
+run-release scene="scene.zon":
+    zig build run {{ release-mode }} -- {{ scene }}
 
 # Runs the program unit tests.
 test:
