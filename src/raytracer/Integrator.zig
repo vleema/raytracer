@@ -26,8 +26,6 @@ pub const Integrator = union(enum) {
         width: u32,
         height: u32,
     ) void {
-        camera.preprocess(width, height);
-
         for (0..height) |y| {
             for (0..width) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);

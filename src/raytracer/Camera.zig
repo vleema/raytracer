@@ -13,16 +13,6 @@ pub const Camera = union(enum) {
     spherical: Spherical,
     rectangular: Rectangular,
 
-    pub fn preprocess(self: *const Camera, width: u32, height: u32) void {
-        const w: f32 = @floatFromInt(width);
-        const h: f32 = @floatFromInt(height);
-
-        return switch (self.*) {
-            .rectangular => |r| r.preprocesss(w, h),
-            .spherical => {},
-        };
-    }
-
     /// Generates a ray coming out of the `Camera`.
     ///
     /// Returns the generated ray.
@@ -59,14 +49,6 @@ const Rectangular = union(enum) {
         top: f32 = 4,
     };
 
-    // SAFETY: Screen window is calculated only one time at the pre-process function, synchronously.
-    var sw: ScreenWindow = undefined;
-
-    fn preprocesss(self: *const Rectangular, width: f32, height: f32) void {
-        const ar = width / height;
-        sw = self.screenWindow(ar);
-    }
-
     fn generateRay(
         self: *const @This(),
         img_x: f32,
@@ -75,6 +57,7 @@ const Rectangular = union(enum) {
         height: f32,
         frame: *const Frame,
     ) Ray {
+        const sw = self.screenWindow(width / height);
         const sw_x: Real(3) = @splat(sw.left + (sw.right - sw.left) * img_x / width);
         const sw_y: Real(3) = @splat(sw.top + (sw.bottom - sw.top) * img_y / height);
 
@@ -90,7 +73,7 @@ const Rectangular = union(enum) {
         };
     }
 
-    fn screenWindow(self: *const @This(), aspect_ratio: f32) ScreenWindow {
+    inline fn screenWindow(self: *const @This(), aspect_ratio: f32) ScreenWindow {
         return switch (self.*) {
             .orthographic => |e| e,
             .perspective => |p| blk: {
@@ -164,7 +147,6 @@ test "orthographic: top-left pixel maps to screen window corner" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
-    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(0, 0, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ -2, 2, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
@@ -176,7 +158,6 @@ test "orthographic: center pixel maps to screen window center" {
         },
     };
     const film = Film{ .width = 4, .height = 4 };
-    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } }, ray);
 }
@@ -184,7 +165,6 @@ test "orthographic: center pixel maps to screen window center" {
 test "orthographic: direction is always frame direction" {
     const cam: Camera = .{ .rectangular = .{ .orthographic = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(3, 1, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
@@ -192,7 +172,6 @@ test "orthographic: direction is always frame direction" {
 test "perspective: origin is always frame origin" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(1, 3, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 0 }), ray.origin);
 }
@@ -200,7 +179,6 @@ test "perspective: origin is always frame origin" {
 test "perspective: center pixel direction equals frame direction" {
     const cam: Camera = .{ .rectangular = .{ .perspective = .{} } };
     const film = Film{ .width = 4, .height = 4 };
-    cam.preprocess(film.width, film.height);
     const ray = cam.generateRay(2, 2, film.width, film.height, &axis_frame);
     try testing.expectEqual(@as(@Vector(3, f32), .{ 0, 0, 1 }), ray.direction);
 }
