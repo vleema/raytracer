@@ -13,11 +13,6 @@
   }: let
     inherit (nixpkgs) lib;
 
-    supportedSystems = [
-      "x86_64-linux"
-      "aarch64-linux"
-    ];
-
     pname = "raytracer-zig";
     version = "0.0.1";
     meta = {
@@ -36,9 +31,9 @@
         || (builtins.match ".*\.(zig|zon)" path != null);
     };
   in
-    flake-utils.lib.eachSystem supportedSystems (
+    flake-utils.lib.eachDefaultSystem (
       system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {inherit system;};
         buildInputs = [];
         nativeBuildInputs = with pkgs; [zig_0_16 just];
       in {
