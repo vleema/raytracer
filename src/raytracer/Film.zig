@@ -15,6 +15,7 @@ height: u32 = 200,
 filename: []const u8 = "out.png",
 format: enum { ppm, png } = .png,
 buf: []const Color = &.{},
+gamma_corrected: bool = true,
 
 pub fn intoImg(
     self: *Film,
@@ -34,7 +35,19 @@ pub fn intoImg(
     }
 }
 
+fn srgbEncode(linear: u8) u8 {
+    const f = @as(f32, @floatFromInt(linear)) / 255.0;
+    const encoded = if (f <= 0.0031308)
+        f * 12.92
+    else
+        1.055 * std.math.pow(f32, f, 1.0 / 2.4) - 0.055;
+    return @intFromFloat(std.math.clamp(encoded, 0.0, 1.0) * 255.0);
+}
+
 pub fn color(self: *const Film, x: u32, y: u32) [3]u8 {
     const c = self.buf[x + y * self.width];
+    if (self.gamma_corrected) {
+        return [_]u8{ srgbEncode(c.r), srgbEncode(c.g), srgbEncode(c.b) };
+    }
     return [_]u8{ c.r, c.g, c.b };
 }
