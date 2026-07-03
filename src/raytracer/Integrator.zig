@@ -172,7 +172,13 @@ pub const Blinn = struct {
         const n_dot_h = vec.dot(3, f32, normal, half_vector);
         const n_dot_l = vec.dot(3, f32, normal, light_dir);
 
-        return intensity * vec.mul_scalar(3, f32, @max(0, n_dot_l), diffuse) +
-            intensity * vec.mul_scalar(3, f32, math.pow(f32, @max(0, n_dot_h), glossiness), specular);
+        const diffuse_contrib = intensity * vec.mul_scalar(3, f32, @max(0, n_dot_l), diffuse);
+        const specular_contrib = if (glossiness > 0)
+            intensity *
+                vec.mul_scalar(3, f32, math.pow(f32, @max(0, n_dot_h), glossiness), specular)
+        else
+            @as(Real(3), @splat(0));
+
+        return diffuse_contrib + specular_contrib;
     }
 };
