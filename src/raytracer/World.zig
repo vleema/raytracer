@@ -131,14 +131,13 @@ const Objects = struct {
                     if (eql(u8, int_name, raw_name)) {
                         found = true;
                         try this.materials.append(gpa, @intCast(i));
+                        break;
                     }
                 }
                 if (!found) {
                     obj_log.err("unknown material name: {s}", .{raw_name});
                     return error.UnknownMaterial;
                 }
-            } else {
-                try this.materials.append(gpa, 0);
             }
         }
 
