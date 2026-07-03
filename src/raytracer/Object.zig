@@ -1,6 +1,8 @@
 const vec = @import("vec");
 const Real = vec.Real;
 
+const std = @import("std");
+
 const Ray = @import("Ray.zig");
 
 tag: Tag,
@@ -31,7 +33,7 @@ pub const Sphere = struct {
         const sqrtd = @sqrt(discriminant);
         var t = (h - sqrtd) / a;
         if (t < tmin or t > tmax) {
-            t += (h + sqrtd) / a;
+            t = (h + sqrtd) / a;
             if (t < tmin or t > tmax) return null;
         }
         const normal = (@as(Real(3), r.at(t)) - @as(Real(3), self.center)) / @as(Real(3), @splat(self.radius));
@@ -113,3 +115,104 @@ pub const Raw = struct {
         return self;
     }
 };
+
+const testing = std.testing;
+
+fn expectVecApproxEq(expected: [3]f32, actual: [3]f32) !void {
+    for (expected, actual) |e, a| {
+        try testing.expectApproxEqAbs(e, a, 1e-6);
+    }
+}
+
+test "sphere: ray from outside hits nearest surface" {
+    const sphere = Sphere{ .center = .{ 0, 0, 5 }, .radius = 1 };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    const hit = sphere.hit(&ray, 0, 100) orelse return error.TestExpectedHit;
+
+    try testing.expectApproxEqAbs(@as(f32, 4), hit.t, 1e-6);
+    try expectVecApproxEq(.{ 0, 0, -1 }, hit.normal);
+}
+
+test "sphere: ray from inside hits far surface" {
+    const sphere = Sphere{ .center = .{ 0, 0, 0 }, .radius = 1 };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    const hit = sphere.hit(&ray, 0.001, 100) orelse return error.TestExpectedHit;
+
+    try testing.expectApproxEqAbs(@as(f32, 1), hit.t, 1e-6);
+    try expectVecApproxEq(.{ 0, 0, 1 }, hit.normal);
+}
+
+test "sphere: ray miss returns null" {
+    const sphere = Sphere{ .center = .{ 0, 0, 5 }, .radius = 1 };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 1, 0 } };
+
+    try testing.expectEqual(null, sphere.hit(&ray, 0, 100));
+}
+
+test "sphere: hit outside t range returns null" {
+    const sphere = Sphere{ .center = .{ 0, 0, 5 }, .radius = 1 };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    try testing.expectEqual(null, sphere.hit(&ray, 0, 3));
+}
+
+test "triangle: ray hits interior" {
+    const triangle = Triangle{
+        .v1 = .{ -1, -1, 5 },
+        .v2 = .{ 1, -1, 5 },
+        .v3 = .{ 0, 1, 5 },
+    };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    const hit = triangle.hit(&ray, 0, 100) orelse return error.TestExpectedHit;
+
+    try testing.expectApproxEqAbs(@as(f32, 5), hit.t, 1e-6);
+    try expectVecApproxEq(.{ 0, 0, 1 }, hit.normal);
+}
+
+test "triangle: ray outside barycentric region misses" {
+    const triangle = Triangle{
+        .v1 = .{ -1, -1, 5 },
+        .v2 = .{ 1, -1, 5 },
+        .v3 = .{ 0, 1, 5 },
+    };
+    const ray = Ray{ .origin = .{ 2, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    try testing.expectEqual(null, triangle.hit(&ray, 0, 100));
+}
+
+test "triangle: parallel ray misses" {
+    const triangle = Triangle{
+        .v1 = .{ -1, -1, 5 },
+        .v2 = .{ 1, -1, 5 },
+        .v3 = .{ 0, 1, 5 },
+    };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 1, 0, 0 } };
+
+    try testing.expectEqual(null, triangle.hit(&ray, 0, 100));
+}
+
+test "plane: ray hits plane" {
+    const plane = Plane{ .pos = .{ 0, 0, 5 }, .normal = .{ 0, 0, 1 } };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 0, 0, 1 } };
+
+    const hit = plane.hit(&ray, 0, 100) orelse return error.TestExpectedHit;
+
+    try testing.expectApproxEqAbs(@as(f32, 5), hit.t, 1e-6);
+    try expectVecApproxEq(.{ 0, 0, 1 }, hit.normal);
+}
+
+test "plane: parallel ray misses" {
+    const plane = Plane{ .pos = .{ 0, 0, 5 }, .normal = .{ 0, 0, 1 } };
+    const ray = Ray{ .origin = .{ 0, 0, 0 }, .direction = .{ 1, 0, 0 } };
+
+    try testing.expectEqual(null, plane.hit(&ray, 0, 100));
+}
+
+test "plane raw: intoInternal normalizes direction" {
+    const plane = (Plane.Raw{ .pos = .{ 0, 0, 0 }, .dir = .{ 0, 0, 2 } }).intoInternal();
+
+    try expectVecApproxEq(.{ 0, 0, 1 }, plane.normal);
+}
