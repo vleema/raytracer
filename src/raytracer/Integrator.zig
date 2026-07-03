@@ -153,7 +153,7 @@ pub const Blinn = struct {
                     const intensity = math.clamp((theta - payload.falloff) / eps, 0.0, 1.0);
                     break :blk .{
                         light_dir,
-                        @as(Real(3), @splat(intensity)),
+                        light.common.intensity * @as(Real(3), @splat(intensity)),
                         light.common.attenuate(&material, light_dist),
                         light_dist,
                     };
