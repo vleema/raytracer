@@ -87,17 +87,16 @@ pub const Blinn = struct {
 
         const view: Real(3) = -@as(Real(3), ray.direction);
         const hit_pt = ray.at(hit.t);
-        const dist = vec.len(3, f32, vec.sub(3, f32, hit_pt, ray.origin));
 
         var light_contrib: Real(3) = .{ 0, 0, 0 };
         const slice = world.lights.list.slice();
         for (slice.items(.tag), slice.items(.common)) |tag, common| {
             const light: Light = .{ .common = common, .tag = tag };
-            light_contrib += lightContrib(world, light, view, hit.normal, hit_pt, dist, blinn);
+            light_contrib += lightContrib(world, light, view, hit.normal, hit_pt, blinn);
         }
         if (depth < self.max_depth) {
-            const direction = view -
-                vec.mul_scalar(3, f32, vec.dot(3, f32, view, hit.normal), hit.normal);
+            const direction = ray.direction -
+                vec.mul_scalar(3, f32, 2 * vec.dot(3, f32, ray.direction, hit.normal), hit.normal);
             const reflected: Ray = .{ .direction = direction, .origin = hit_pt };
             if (world.objHit(&reflected, 0.0001, math.inf(f32))) |h| {
                 light_contrib += blinn.mirror * self.li(world, reflected, h.hit, h.material, depth + 1).toReal();
@@ -113,7 +112,6 @@ pub const Blinn = struct {
         view: Real(3),
         normal: Real(3),
         hit_pt: [3]f32,
-        dist: f32,
         material: Material.Blinn,
     ) Real(3) {
         const light_dir, const intensity, const attenuated, const shadow_max =
@@ -126,15 +124,21 @@ pub const Blinn = struct {
                 .directional => blk: {
                     const payload = world.lights.directional.items[light.common.extra_idx];
                     const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, payload.to));
-                    break :blk .{ light_dir, light.common.intensity, material, 50 };
+                    break :blk .{
+                        light_dir,
+                        light.common.intensity,
+                        material,
+                        std.math.inf(f32),
+                    };
                 },
                 .point => blk: {
                     const payload = world.lights.point.items[light.common.extra_idx];
                     const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, hit_pt));
+                    const light_dist = vec.len(3, f32, vec.sub(3, f32, payload.from, hit_pt));
                     break :blk .{
                         light_dir,
                         light.common.intensity,
-                        light.common.attenuate(&material, dist),
+                        light.common.attenuate(&material, light_dist),
                         std.math.inf(f32),
                     };
                 },
@@ -142,13 +146,14 @@ pub const Blinn = struct {
                     const payload = world.lights.spotlight.items[light.common.extra_idx];
                     const opposite = vec.normalize(3, f32, vec.sub(3, f32, payload.from, payload.to));
                     const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, hit_pt));
+                    const light_dist = vec.len(3, f32, vec.sub(3, f32, payload.from, hit_pt));
                     const theta = vec.dot(3, f32, light_dir, opposite);
                     const eps = payload.cutoff - payload.falloff;
                     const intensity = math.clamp((theta - payload.falloff) / eps, 0.0, 1.0);
                     break :blk .{
                         light_dir,
                         @as(Real(3), @splat(intensity)),
-                        light.common.attenuate(&material, dist),
+                        light.common.attenuate(&material, light_dist),
                         std.math.inf(f32),
                     };
                 },
