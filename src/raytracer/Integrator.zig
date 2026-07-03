@@ -149,8 +149,8 @@ pub const Blinn = struct {
                     const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, hit_pt));
                     const light_dist = vec.len(3, f32, vec.sub(3, f32, payload.from, hit_pt));
                     const theta = vec.dot(3, f32, light_dir, opposite);
-                    const eps = payload.cutoff - payload.falloff;
-                    const intensity = math.clamp((theta - payload.falloff) / eps, 0.0, 1.0);
+                    const eps = payload.falloff - payload.cutoff;
+                    const intensity = math.clamp((theta - payload.cutoff) / eps, 0.0, 1.0);
                     break :blk .{
                         light_dir,
                         light.common.intensity * @as(Real(3), @splat(intensity)),

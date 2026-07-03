@@ -9,15 +9,15 @@ const World = @import("World.zig");
 
 const RT3 = @This();
 
-scene: Scene = .{},
-world: World = .{},
+scene: Scene,
+world: World,
 
 pub const Raw = struct {
-    scene: Scene = .{},
-    world: World.Raw = .{},
+    scene: Scene,
+    world: World.Raw,
 
     pub fn intoInternal(self: @This(), gpa: Allocator) !RT3 {
-        var rt: RT3 = .{};
+        var rt: RT3 = undefined;
         errdefer rt.deinit(gpa);
         rt.scene = self.scene;
         rt.world = try self.world.intoInternal(gpa);

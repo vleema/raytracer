@@ -60,8 +60,8 @@ pub const Point = struct {
 pub const Spotlight = struct {
     from: [3]f32,
     to: [3]f32,
-    cutoff: f32 = 60,
-    falloff: f32 = 30,
+    cutoff: f32,
+    falloff: f32,
 };
 
 pub const Variant = union(Tag) {
@@ -73,8 +73,8 @@ pub const Variant = union(Tag) {
 
 pub const Raw = struct {
     inner: Variant,
-    scale: [3]f32 = .{ 1, 1, 1 },
-    intensity: [3]f32 = .{ 1, 1, 1 },
+    scale: [3]f32,
+    intensity: [3]f32,
     attenuation: Common.Attenuation = .{
         .constant = 1,
         .linear = 0.09,
