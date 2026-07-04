@@ -33,6 +33,8 @@ pub fn intoImg(
         .png => try png.writeTrueColor8(self, gpa, io, out, self.width, self.height),
         .ppm => try ppm.writeP6(self, io, out, self.width, self.height),
     }
+
+    std.log.info("saved into: {s}", .{self.filename});
 }
 
 fn srgbEncode(linear: u8) u8 {

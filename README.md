@@ -1,5 +1,13 @@
 # Raytracer project - Computer Graphics
 
+Lightweight raytracer written in zig. WIP.
+
+![Teapot](./scenes/teapot/teapot.png)
+
+> Scene file [./scenes/teapot/teapot.zon](./scenes/teapot/teapot.zon).
+
+## Build
+
 Make sure you have zig 0.16.0 installed before building. Use:
 
 ```bash
@@ -43,3 +51,15 @@ nix run . -- <args..>
 # Executes tests and linting.
 nix flake check
 ```
+
+## Examples
+
+![Spotlights](./scenes/spotlights/spotlights.png)
+
+> Scene file
+> [./scenes/spotlights/spotlights.zon](./scenes/spotlights/spotlights.zon)
+
+![Row of Spheres](./scenes/rows_mirror_spheres/row_of_spheres_gc.png)
+
+> Scene file
+> [./scenes/rows_mirror_spheres/row_of_spheres_gc.zon](./scenes/rows_mirror_spheres/row_of_spheres_gc.zon)
