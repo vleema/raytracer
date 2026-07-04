@@ -24,7 +24,7 @@
             .height = 1500,
             .filename = "row_of_spheres_gc.png",
             .format = .png,
-            .gamma_corrected = true,
+            .gamma_corrected = false,
         },
     },
     .world = .{

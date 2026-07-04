@@ -1,0 +1,51 @@
+.{
+    .scene = .{
+        .lookat = .{
+            .from = .{ 0, -90, 30 },
+            .at = .{ 0, 0, 0 },
+            .up = .{ 0, 1, 0 },
+        },
+        .camera = .{
+            .rectangular = .{ .perspective = .{ .fovy = 25 } },
+        },
+        .integrator = .{
+            .blinn = .{ .max_depth = 5 },
+        },
+        .film = .{
+            .tag = .image,
+            .width = 1920,
+            .height = 1080,
+            .filename = "teapot.png",
+            .format = .png,
+            .gamma_corrected = false,
+        },
+    },
+    .world = .{
+        .background = .{
+            .four_colors = .{
+                .bl = .{ .rgb_f32 = .{ 0.6, 0.8, 1 } },
+                .tl = .{ .rgb_f32 = .{ 0.04, 0.04, 0.04 } },
+                .tr = .{ .rgb_f32 = .{ 0.04, 0.04, 0.04 } },
+                .br = .{ .rgb_f32 = .{ 0.6, 0.8, 1 } },
+            },
+        },
+        .lights = .{
+            .{
+                .inner = .{ .directional = .{ .from = .{ -5, -5, 10 }, .to = .{ 0, 0, 0 } } },
+                .intensity = .{ 0.9, 0.6, 0.5 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{ .constant = 1, .linear = 0, .quadratic = 0 },
+            },
+            .{
+                .inner = .{ .directional = .{ .from = .{ 5, -5, 10 }, .to = .{ 0, 0, 0 } } },
+                .intensity = .{ 0.9, 0.9, 0.9 },
+                .scale = .{ 1, 1, 1 },
+                .attenuation = .{ .constant = 1, .linear = 0, .quadratic = 0 },
+            },
+        },
+        .obj_files = .{
+            "teapot.obj",
+            "plane.obj",
+        },
+    },
+}
