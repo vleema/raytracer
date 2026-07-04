@@ -2,7 +2,9 @@ const std = @import("std");
 
 const raytracer = @import("raytracer.zig");
 
-// TODO: Implement utilities for specifying raytracer options.
+// TODO: Implement utilities for specifying raytracer options, i.e.
+// - Number of threads on the cpu.
+// - If it will use the gpu.
 // TODO: Add a progress bar.
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena;

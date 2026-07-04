@@ -60,6 +60,12 @@ pub fn build(b: *std.Build) void {
     inline for (libs) |lib| {
         addLib(b, mod, test_step, check_step, lib);
     }
+
+    const obj = b.dependency("obj", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    mod.addImport("obj", obj.module("obj"));
 }
 
 fn addLib(

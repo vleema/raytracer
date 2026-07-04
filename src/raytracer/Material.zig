@@ -5,20 +5,26 @@ const Light = @import("Light.zig");
 
 const Material = @This();
 
-tag: Tag = .flat,
-common: Common = .{},
+tag: Tag,
+name: []const u8 = "default",
+extra_idx: u32 = 0,
 
 pub const Tag = enum {
     flat,
     blinn,
 };
 
-pub const Common = struct {
+pub const Flat = struct {
     color: Color = .{},
-    extra_idx: u32 = 0,
-};
 
-pub const Flat = struct {};
+    pub const Raw = struct {
+        color: Color.Raw = .{ .hex = "#ff0000" },
+    };
+
+    pub fn fromRaw(r: Flat.Raw) !Flat {
+        return .{ .color = try .fromRaw(r.color) };
+    }
+};
 
 pub const Blinn = struct {
     ambient: [3]f32,
@@ -46,15 +52,14 @@ pub const Blinn = struct {
 pub const Raw = struct {
     name: []const u8,
     inner: union(Tag) {
-        flat: struct {},
+        flat: Flat.Raw,
         blinn: Blinn,
     },
-    color: Color.Raw,
 
     pub fn intoInternal(self: @This()) !Material {
         return .{
             .tag = self.inner,
-            .common = .{ .color = try self.color.intoInternal() },
+            .name = self.name,
         };
     }
 };

@@ -9,18 +9,18 @@ const World = @import("World.zig");
 
 const RT3 = @This();
 
-scene: Scene,
-world: World,
+scene: Scene = .{},
+world: World = .{},
 
 pub const Raw = struct {
     scene: Scene,
     world: World.Raw,
 
-    pub fn intoInternal(self: @This(), gpa: Allocator) !RT3 {
-        var rt: RT3 = undefined;
+    pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !RT3 {
+        var rt: RT3 = .{};
         errdefer rt.deinit(gpa);
         rt.scene = self.scene;
-        rt.world = try self.world.intoInternal(gpa);
+        rt.world = try self.world.intoInternal(gpa, source_path);
         return rt;
     }
 };
@@ -52,7 +52,7 @@ pub fn fromZonFile(gpa: Allocator, io: Io, dir: Io.Dir, path: []const u8) !RT3 {
         }
         return err;
     };
-    return try parsed.intoInternal(gpa);
+    return try parsed.intoInternal(gpa, path);
 }
 
 pub fn render(self: *RT3, gpa: Allocator, io: Io, dir: Io.Dir) !void {

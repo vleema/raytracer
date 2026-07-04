@@ -1,21 +1,25 @@
+const std = @import("std");
+const testing = std.testing;
+
 const vec = @import("vec");
 const Real = vec.Real;
-
-const std = @import("std");
 
 const Ray = @import("Ray.zig");
 
 tag: Tag,
-common: Common,
+common: Common = .{},
 
 pub const Tag = enum {
     sphere,
-    triangle,
     plane,
+    mesh,
 };
 
 pub const Common = struct {
     extra_idx: u32 = 0,
+    // FIX: Having this field 0 as default is not ideal, one can skip specifying
+    // a material and the program will silently use the first one available.
+    material: u32 = 0,
 };
 
 pub const Sphere = struct {
@@ -42,32 +46,96 @@ pub const Sphere = struct {
     }
 };
 
-pub const Triangle = struct {
-    v1: [3]f32,
-    v2: [3]f32,
-    v3: [3]f32,
+pub const Mesh = struct {
+    indices: []Idx,
+    materials: []u32,
+    attrs: u32,
 
-    pub fn hit(self: *const Triangle, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
-        const e1 = @as(Real(3), self.v2) - @as(Real(3), self.v1);
-        const e2 = @as(Real(3), self.v3) - @as(Real(3), self.v1);
+    pub const Attributes = struct {
+        vertices: []f32,
+        normals: []f32,
+    };
 
-        const pvec = vec.cross3(f32, r.direction, e2);
-        const det = vec.dot(3, f32, e1, pvec);
-        if (@abs(det) < 1e-8) return null;
-        const inv_det = 1.0 / det;
+    pub const Idx = struct {
+        vertex: usize,
+        normal: usize,
+    };
 
-        const svec = @as(Real(3), r.origin) - @as(Real(3), self.v1);
-        const beta = vec.dot(3, f32, svec, pvec) * inv_det;
-        if (beta < 0 or beta > 1) return null;
+    pub const Triangle = struct {
+        v1: [3]f32,
+        v2: [3]f32,
+        v3: [3]f32,
 
-        const qvec = vec.cross3(f32, svec, e1);
-        const gamma = vec.dot(3, f32, r.direction, qvec) * inv_det;
-        if (gamma < 0 or beta + gamma > 1.0) return null;
+        /// Tries to find a intersection with a ray using Möller-Trumbore algorithm.
+        pub fn hit(
+            self: *const @This(),
+            r: *const Ray,
+            tmin: f32,
+            tmax: f32,
+        ) ?struct { t: f32, beta: f32, gamma: f32 } {
+            const e1 = @as(Real(3), self.v2) - @as(Real(3), self.v1);
+            const e2 = @as(Real(3), self.v3) - @as(Real(3), self.v1);
 
-        const t = vec.dot(3, f32, e2, qvec) * inv_det;
-        if (t < tmin or t > tmax) return null;
+            const pvec = vec.cross3(f32, r.direction, e2);
+            const det = vec.dot(3, f32, e1, pvec);
+            if (@abs(det) < 1e-8) return null;
+            const inv_det = 1.0 / det;
 
-        return .{ .t = t, .normal = vec.normalize(3, f32, vec.cross3(f32, e1, e2)) };
+            const svec = @as(Real(3), r.origin) - @as(Real(3), self.v1);
+            const beta = vec.dot(3, f32, svec, pvec) * inv_det;
+            if (beta < 0 or beta > 1) return null;
+
+            const qvec = vec.cross3(f32, svec, e1);
+            const gamma = vec.dot(3, f32, r.direction, qvec) * inv_det;
+            if (gamma < 0 or beta + gamma > 1.0) return null;
+
+            const t = vec.dot(3, f32, e2, qvec) * inv_det;
+            if (t < tmin or t > tmax) return null;
+
+            return .{ .t = t, .beta = beta, .gamma = gamma };
+        }
+    };
+
+    pub fn hit(
+        self: *const Mesh,
+        attrs: *const Attributes,
+        r: *const Ray,
+        tmin: f32,
+        tmax: f32,
+    ) ?Hit {
+        var max = tmax;
+        var result: ?Hit = null;
+        for (0..self.indices.len / 3) |i| {
+            const tri = self.triangle(attrs, i);
+            if (tri.hit(r, tmin, max)) |v| {
+                max = v.t;
+                const n0 = self.indices[i * 3].normal * 3;
+                const n1 = self.indices[i * 3 + 1].normal * 3;
+                const n2 = self.indices[i * 3 + 2].normal * 3;
+                const alpha = 1.0 - v.beta - v.gamma;
+                var interp: [3]f32 = undefined;
+                for (&interp, 0..) |*comp, j| {
+                    comp.* =
+                        alpha * attrs.normals[n0 + j] +
+                        v.beta * attrs.normals[n1 + j] +
+                        v.gamma * attrs.normals[n2 + j];
+                }
+                result = .{
+                    .t = v.t,
+                    .normal = vec.normalize(3, f32, @as(Real(3), interp)),
+                    .face = i,
+                };
+            }
+        }
+        return result;
+    }
+
+    pub fn triangle(self: *const Mesh, attrs: *const Attributes, idx: usize) Mesh.Triangle {
+        return .{
+            .v1 = attrs.vertices[self.indices[idx * 3].vertex * 3 ..][0..3].*,
+            .v2 = attrs.vertices[self.indices[idx * 3 + 1].vertex * 3 ..][0..3].*,
+            .v3 = attrs.vertices[self.indices[idx * 3 + 2].vertex * 3 ..][0..3].*,
+        };
     }
 };
 
@@ -101,13 +169,20 @@ pub const Plane = struct {
 pub const Hit = struct {
     t: f32,
     normal: [3]f32,
+    face: usize = 0,
 };
 
 pub const Raw = struct {
-    inner: union(Tag) {
+    inner: union(enum) {
         sphere: Sphere,
-        triangle: Triangle,
         plane: Plane.Raw,
+
+        pub fn intoTag(self: @This()) Tag {
+            return switch (self) {
+                .sphere => .sphere,
+                .plane => .plane,
+            };
+        }
     },
     material: ?[]const u8 = null,
 
@@ -115,8 +190,6 @@ pub const Raw = struct {
         return self;
     }
 };
-
-const testing = std.testing;
 
 fn expectVecApproxEq(expected: [3]f32, actual: [3]f32) !void {
     for (expected, actual) |e, a| {
@@ -158,6 +231,8 @@ test "sphere: hit outside t range returns null" {
     try testing.expectEqual(null, sphere.hit(&ray, 0, 3));
 }
 
+const Triangle = Mesh.Triangle;
+
 test "triangle: ray hits interior" {
     const triangle = Triangle{
         .v1 = .{ -1, -1, 5 },
@@ -169,7 +244,6 @@ test "triangle: ray hits interior" {
     const hit = triangle.hit(&ray, 0, 100) orelse return error.TestExpectedHit;
 
     try testing.expectApproxEqAbs(@as(f32, 5), hit.t, 1e-6);
-    try expectVecApproxEq(.{ 0, 0, 1 }, hit.normal);
 }
 
 test "triangle: ray outside barycentric region misses" {

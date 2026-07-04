@@ -9,7 +9,6 @@ const Color = @import("Color.zig");
 const Frame = @import("Look.zig").Frame;
 const Light = @import("Light.zig");
 const Material = @import("Material.zig");
-const Object = @import("Object.zig");
 const Ray = @import("Ray.zig");
 const World = @import("World.zig");
 
@@ -29,8 +28,8 @@ pub const Integrator = union(enum) {
         for (0..height) |y| {
             for (0..width) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);
-                const color = if (world.objHit(&ray, std.math.inf(f32))) |v|
-                    self.li(world, ray, v.hit, v.material, 0)
+                const color = if (world.objHit(&ray, std.math.inf(f32))) |h|
+                    self.li(world, ray, h, 0)
                 else
                     // TODO: Add texture background.
                     world.background.ptColor(
@@ -48,12 +47,11 @@ pub const Integrator = union(enum) {
         self: *const Integrator,
         world: *const World,
         ray: Ray,
-        hit: Object.Hit,
-        material: Material,
+        hit: World.Hit,
         depth: u32,
     ) Color {
         return switch (self.*) {
-            inline else => |v| v.li(world, ray, hit, material, depth),
+            inline else => |v| v.li(world, ray, hit, depth),
         };
     }
 };
@@ -61,13 +59,15 @@ pub const Integrator = union(enum) {
 pub const Flat = struct {
     pub fn li(
         _: anytype,
+        world: *const World,
         _: anytype,
-        _: anytype,
-        _: anytype,
-        material: Material,
+        hit: World.Hit,
         _: anytype,
     ) Color {
-        return material.common.color;
+        return switch (hit.material.tag) {
+            .flat => world.materials.flat.items[hit.material.extra_idx].color,
+            .blinn => .fromReal(world.materials.blinn.items[hit.material.extra_idx].diffuse),
+        };
     }
 };
 
@@ -78,12 +78,11 @@ pub const Blinn = struct {
         self: *const Blinn,
         world: *const World,
         ray: Ray,
-        hit: Object.Hit,
-        material: Material,
+        hit: World.Hit,
         depth: u32,
     ) Color {
-        if (material.tag != .blinn) return material.common.color;
-        const blinn = world.materials.blinn.items[material.common.extra_idx];
+        if (hit.material.tag == .flat) return world.materials.flat.items[hit.material.extra_idx].color;
+        const blinn = world.materials.blinn.items[hit.material.extra_idx];
 
         const view: Real(3) = -@as(Real(3), ray.direction);
         const hit_pt = ray.at(hit.t);
@@ -100,11 +99,10 @@ pub const Blinn = struct {
             const reflect_origin = hit_pt + @as(Real(3), @splat(0.001)) * hit.normal;
             const reflected: Ray = .{ .direction = direction, .origin = reflect_origin };
             if (world.objHit(&reflected, math.inf(f32))) |h| {
-                light_contrib += blinn.mirror * self.li(world, reflected, h.hit, h.material, depth + 1).toReal();
+                light_contrib += blinn.mirror * self.li(world, reflected, h, depth + 1).toReal();
             }
         }
-        const base = material.common.color.toReal();
-        return .fromReal(base * light_contrib);
+        return .fromReal(light_contrib);
     }
 
     fn lightContrib(

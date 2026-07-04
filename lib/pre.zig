@@ -79,7 +79,7 @@ fn resolveIncludes(
         try out.appendSlice(gpa, sourceZ[pos..]);
 }
 
-fn resolvePath(gpa: Allocator, source_path: []const u8, include_path: []const u8) ![]u8 {
+pub fn resolvePath(gpa: Allocator, source_path: []const u8, include_path: []const u8) ![]u8 {
     if (std.fs.path.isAbsolute(include_path)) {
         return gpa.dupe(u8, include_path);
     }

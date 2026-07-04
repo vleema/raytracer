@@ -9,14 +9,17 @@
             .rectangular = .{ .perspective = .{ .fovy = 65 } },
         },
         .integrator = .{
-            .blinn = .{},
+            .blinn = .{
+                .max_depth = 10,
+            },
         },
         .film = .{
             .tag = .image,
-            .width = 800,
-            .height = 600,
-            .filename = "out.png",
+            .width = 1920,
+            .height = 1080,
+            .filename = "three_balls.png",
             .format = .png,
+            .gamma_corrected = true,
         },
     },
     .world = .{
@@ -37,9 +40,9 @@
                         .diffuse = .{ 0.5, 0.5, 0.5 },
                         .specular = .{ 0.1, 0.1, 0.1 },
                         .glossiness = 32,
+                        .mirror = .{ 0, 0, 0 },
                     },
                 },
-                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
             },
             .{
                 .name = "gold",
@@ -49,9 +52,9 @@
                         .diffuse = .{ 1.0, 0.65, 0.0 },
                         .specular = .{ 0.8, 0.6, 0.2 },
                         .glossiness = 256,
+                        .mirror = .{ 0, 0, 0 },
                     },
                 },
-                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
             },
             .{
                 .name = "red_shiny",
@@ -61,9 +64,9 @@
                         .diffuse = .{ 1.0, 0.15, 0.15 },
                         .specular = .{ 0.7, 0.7, 0.7 },
                         .glossiness = 128,
+                        .mirror = .{ 0, 0, 0 },
                     },
                 },
-                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
             },
             .{
                 .name = "blue_matte",
@@ -72,15 +75,15 @@
                         .ambient = .{ 0.03, 0.03, 0.15 },
                         .diffuse = .{ 0.15, 0.15, 1.0 },
                         .specular = .{ 0.0, 0.0, 0.0 },
+                        .mirror = .{ 0, 0, 0 },
                         .glossiness = 1,
                     },
                 },
-                .color = .{ .rgb_f32 = .{ 1.0, 1.0, 1.0 } },
             },
         },
         .objects = .{
             .{
-                .inner = .{ .plane = .{ .dir = .{ 0, 1, 0 }, .pos = .{ 0, -9, 12 } } },
+                .inner = .{ .plane = .{ .dir = .{ 0, 1, 0 }, .pos = .{ 0, -2, 12 } } },
                 .material = "ground",
             },
             .{
@@ -99,15 +102,13 @@
         .lights = .{
             .{
                 .inner = .{ .ambient = .{} },
-                .common = .{ .intensity = .{ 0.1, 0.1, 0.12 }, .scale = .{ 1, 1, 1 } },
-            },
-            .{
-                .inner = .{ .directional = .{ .from = .{ 5, 10, 12 }, .to = .{ 0, 0, 5 } } },
-                .common = .{ .intensity = .{ 1, 1, 1 }, .scale = .{ 0.6, 0.6, 0.6 } },
+                .intensity = .{ 0.1, 0.1, 0.12 },
+                .scale = .{ 1, 1, 1 },
             },
             .{
                 .inner = .{ .point = .{ .from = .{ 1, 2, 3 } } },
-                .common = .{ .intensity = .{ 1, 0.85, 0.6 }, .scale = .{ 1.0, 0.65, 0.65 } },
+                .intensity = .{ 1, 0.85, 0.6 },
+                .scale = .{ 1.0, 0.65, 0.65 },
             },
         },
     },

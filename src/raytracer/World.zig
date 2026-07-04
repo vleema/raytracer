@@ -1,9 +1,12 @@
 const std = @import("std");
-const vec = @import("vec");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const MultiArrayList = std.MultiArrayList;
 const eql = std.mem.eql;
+
+const obj = @import("obj");
+const pre = @import("pre");
+const vec = @import("vec");
 
 const Color = @import("Color.zig");
 const lerp = @import("lerp.zig");
@@ -13,10 +16,11 @@ const Directional = Light.Directional;
 const Spotlight = Light.Spotlight;
 const Material = @import("Material.zig");
 const Blinn = Material.Blinn;
+const Flat = Material.Flat;
 const Object = @import("Object.zig");
 const Plane = Object.Plane;
 const Sphere = Object.Sphere;
-const Triangle = Object.Triangle;
+const Mesh = Object.Mesh;
 const Ray = @import("Ray.zig");
 
 const World = @This();
@@ -32,60 +36,72 @@ pub fn deinit(self: *@This(), gpa: Allocator) void {
     self.lights.deinit(gpa);
 }
 
-pub fn objHit(
-    self: *const World,
-    r: *const Ray,
-    max_dist: f32,
-) ?struct { hit: Object.Hit, material: Material } {
+pub const Hit = struct {
+    t: f32,
+    normal: [3]f32,
+    material: Material,
+};
+
+pub fn objHit(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
     const tmin = 0;
     var tmax = max_dist;
-    var closest_hit: ?Object.Hit = null;
-    var material: ?Material = null;
+    var closest_hit: ?Hit = null;
 
     const slice = self.objects.list.slice();
     const tags = slice.items(.tag);
     const commons = slice.items(.common);
-    for (tags, commons, self.objects.materials.items) |t, c, m| {
-        const hit = switch (t) {
+    for (tags, commons) |tag, c| {
+        const hit = switch (tag) {
             .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
-            .triangle => self.objects.triangles.items[c.extra_idx].hit(r, tmin, tmax),
             .plane => self.objects.planes.items[c.extra_idx].hit(r, tmin, tmax),
+            .mesh => b: {
+                const mesh = self.objects.meshes.get(c.extra_idx);
+                const attrs = self.objects.mesh_attrs.items[mesh.attrs];
+                break :b mesh.hit(&attrs, r, tmin, tmax);
+            },
+        } orelse continue;
+        const material = switch (tag) {
+            .mesh => self.objects.meshes.get(c.extra_idx).materials[hit.face],
+            else => c.material,
         };
-        if (hit) |h| {
-            closest_hit = h;
-            tmax = h.t;
-            material = self.materials.list.items[m];
-        }
+        closest_hit = .{
+            .t = hit.t,
+            .normal = hit.normal,
+            .material = self.materials.list.get(material),
+        };
+        tmax = hit.t;
     }
-
-    if (closest_hit != null and material != null) return .{
-        .hit = closest_hit.?,
-        .material = material.?,
-    };
-
-    return null;
+    return closest_hit orelse null;
 }
 
 const Materials = struct {
-    list: ArrayList(Material) = .empty,
-    names: ArrayList([]const u8) = .empty,
-
+    list: MultiArrayList(Material) = .empty,
     blinn: ArrayList(Blinn) = .empty,
+    flat: ArrayList(Flat) = .empty,
 
     fn deinit(self: *@This(), gpa: Allocator) void {
-        for (self.names.items) |n| gpa.free(n);
-        self.names.deinit(gpa);
+        for (self.list.items(.name)) |n| gpa.free(n);
         self.list.deinit(gpa);
         self.blinn.deinit(gpa);
+        self.flat.deinit(gpa);
     }
 
-    fn add(self: *@This(), gpa: Allocator, raw: Material.Raw) !void {
-        try self.names.append(gpa, try gpa.dupe(u8, raw.name));
-        var mat = try raw.intoInternal();
+    fn appendRaw(self: *@This(), gpa: Allocator, raw: Material.Raw) !void {
+        const names = self.list.items(.name);
+        for (names) |name| {
+            if (std.mem.eql(u8, name, raw.name)) {
+                std.log.err("duplicate material '{s}'", .{name});
+                return error.DuplicateMaterial;
+            }
+        }
+        var mat: Material = .{ .tag = raw.inner, .name = raw.name };
         switch (raw.inner) {
-            .flat => {},
+            .flat => |f| {
+                mat.extra_idx = @intCast(self.flat.items.len);
+                try self.flat.append(gpa, try .fromRaw(f));
+            },
             .blinn => |b| {
-                mat.common.extra_idx = @intCast(self.blinn.items.len);
+                mat.extra_idx = @intCast(self.blinn.items.len);
                 try self.blinn.append(gpa, b);
             },
         }
@@ -95,73 +111,67 @@ const Materials = struct {
     fn fromRawList(gpa: Allocator, raw: []const Material.Raw) !@This() {
         var this = @This(){};
         errdefer this.deinit(gpa);
-        for (raw) |r| try this.add(gpa, r);
+        for (raw) |r| try this.appendRaw(gpa, r);
         return this;
     }
 };
 
 const Objects = struct {
     list: MultiArrayList(Object) = .empty,
-    materials: ArrayList(u16) = .empty,
 
     spheres: ArrayList(Sphere) = .empty,
-    triangles: ArrayList(Triangle) = .empty,
     planes: ArrayList(Plane) = .empty,
+    meshes: MultiArrayList(Mesh) = .empty,
+    mesh_attrs: ArrayList(Mesh.Attributes) = .empty,
 
     const obj_log = std.log.scoped(.@"world.objects");
 
     fn deinit(self: *@This(), gpa: Allocator) void {
         self.list.deinit(gpa);
         self.spheres.deinit(gpa);
-        self.triangles.deinit(gpa);
         self.planes.deinit(gpa);
-        self.materials.deinit(gpa);
+        for (self.meshes.items(.indices)) |i| gpa.free(i);
+        for (self.mesh_attrs.items) |a| {
+            gpa.free(a.vertices);
+            gpa.free(a.normals);
+        }
+        self.meshes.deinit(gpa);
+        self.mesh_attrs.deinit(gpa);
     }
 
     fn fromRawList(gpa: Allocator, raw_objs: []const Object.Raw, materials: *Materials) !Objects {
-        std.debug.assert(materials.list.items.len < std.math.maxInt(u16));
-
         var this = @This(){};
         errdefer this.deinit(gpa);
+        try this.list.ensureUnusedCapacity(gpa, raw_objs.len);
 
         for (raw_objs) |raw| {
-            if (raw.material) |raw_name| {
+            var new: Object = .{ .tag = raw.inner.intoTag() };
+            if (raw.material) |raw_material| {
                 var found = false;
-                for (materials.names.items, 0..) |int_name, i| {
-                    if (eql(u8, int_name, raw_name)) {
+                const names = materials.list.items(.name);
+                for (names, 0..) |n, i| {
+                    if (eql(u8, n, raw_material)) {
+                        new.common.material = @intCast(i);
                         found = true;
-                        try this.materials.append(gpa, @intCast(i));
                         break;
                     }
                 }
                 if (!found) {
-                    obj_log.err("unknown material name: {s}", .{raw_name});
+                    obj_log.err("unknown material name: {s}", .{raw_material});
                     return error.UnknownMaterial;
                 }
             }
-        }
-
-        for (raw_objs) |raw| {
-            // SAFETY: `idx` is initialized by the switch below.
-            var idx: u32 = undefined;
             switch (raw.inner) {
                 .sphere => |s| {
-                    idx = @intCast(this.spheres.items.len);
+                    new.common.extra_idx = @intCast(this.spheres.items.len);
                     try this.spheres.append(gpa, s);
                 },
-                .triangle => |t| {
-                    idx = @intCast(this.triangles.items.len);
-                    try this.triangles.append(gpa, t);
-                },
                 .plane => |p| {
-                    idx = @intCast(this.planes.items.len);
+                    new.common.extra_idx = @intCast(this.planes.items.len);
                     try this.planes.append(gpa, p.intoInternal());
                 },
             }
-            try this.list.append(gpa, .{
-                .tag = @as(Object.Tag, raw.inner),
-                .common = .{ .extra_idx = idx },
-            });
+            this.list.appendAssumeCapacity(new);
         }
 
         return this;
@@ -254,14 +264,14 @@ pub const Background = union(enum) {
             return switch (self) {
                 .single_color => |s| .{
                     .single_color = .{
-                        .color = try s.color.intoInternal(),
+                        .color = try .fromRaw(s.color),
                     },
                 },
                 .four_colors => |f| .{ .four_colors = .{
-                    .tl = try f.tl.intoInternal(),
-                    .tr = try f.tr.intoInternal(),
-                    .bl = try f.bl.intoInternal(),
-                    .br = try f.br.intoInternal(),
+                    .tl = try .fromRaw(f.tl),
+                    .tr = try .fromRaw(f.tr),
+                    .bl = try .fromRaw(f.bl),
+                    .br = try .fromRaw(f.br),
                 } },
             };
         }
@@ -273,8 +283,9 @@ pub const Raw = struct {
     materials: []Material.Raw = &.{},
     objects: []Object.Raw = &.{},
     lights: []Light.Raw = &.{},
+    obj_files: []const []const u8 = &.{},
 
-    pub fn intoInternal(self: @This(), gpa: Allocator) !World {
+    pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !World {
         var world: World = .{};
         errdefer world.deinit(gpa);
 
@@ -283,6 +294,98 @@ pub const Raw = struct {
         world.objects = try .fromRawList(gpa, self.objects, &world.materials);
         world.lights = try .fromRawList(gpa, self.lights);
 
+        for (self.obj_files) |f| {
+            const path = try pre.resolvePath(gpa, source_path, f);
+            try world.loadObjFile(gpa, path);
+        }
+
+        if (world.materials.list.len == 0 and world.objects.list.len > 0) {
+            std.log.err("objects have no material defined", .{});
+            return error.NoMaterial;
+        }
+
         return world;
     }
 };
+
+pub fn loadObjFile(self: *World, gpa: Allocator, filename: []const u8) !void {
+    var scene: obj.tobj_scene_f = .{};
+    var cfg = obj.tobj_default_config();
+    var diag: obj.tobj_diag = .{};
+
+    defer obj.tobj_scene_free_f(&scene);
+    defer obj.tobj_diag_free(&diag, null);
+
+    if (obj.tobj_load_obj_from_file_f(&scene, @ptrCast(filename), &cfg, &diag) != obj.TOBJ_OK) {
+        if (diag.err != null) std.log.err("{s}", .{diag.err});
+        return error.ErrorLoadingObjFile;
+    }
+
+    // Load the meshes attributes.
+    const mesh_attrs: Mesh.Attributes = .{
+        .vertices = try gpa.alloc(f32, scene.attrib.vertices.count),
+        .normals = try gpa.alloc(f32, scene.attrib.normals.count),
+    };
+    try self.objects.mesh_attrs.append(gpa, mesh_attrs);
+    try self.materials.list.ensureUnusedCapacity(gpa, scene.num_materials);
+    try self.materials.blinn.ensureUnusedCapacity(gpa, scene.num_materials);
+    try self.objects.meshes.ensureUnusedCapacity(gpa, scene.num_shapes);
+    try self.objects.list.ensureUnusedCapacity(gpa, scene.num_shapes);
+
+    @memcpy(mesh_attrs.vertices, scene.attrib.vertices.ptr);
+    @memcpy(mesh_attrs.normals, scene.attrib.normals.ptr);
+
+    const material_offset: u32 = @intCast(self.materials.list.len);
+
+    // Add the materials to the world.
+    for (0..scene.num_materials) |m| {
+        const material = scene.materials[m];
+        const new: Material = .{
+            .tag = .blinn,
+            .extra_idx = @intCast(self.materials.blinn.items.len),
+            .name = try gpa.dupe(u8, std.mem.span(material.name)),
+        };
+        const blinn: Material.Blinn = .{
+            // TODO: Add support for the other obj file fields.
+            .ambient = material.ambient,
+            .diffuse = material.diffuse,
+            .specular = material.specular,
+            .mirror = @splat(material.metallic), // NOTE: There's no mirror field in the mtl repr.
+            .glossiness = 1 - material.roughness,
+        };
+        // FIX: Append a namespace or sort a merge strategy for materials names.
+        self.materials.list.appendAssumeCapacity(new);
+        self.materials.blinn.appendAssumeCapacity(blinn);
+    }
+
+    // Add the meshes.
+    for (0..scene.num_shapes) |s| {
+        const tobj_mesh = scene.shapes[s].mesh;
+        const new: Object = .{
+            .tag = .mesh,
+            .common = .{ .extra_idx = @intCast(self.objects.meshes.len) },
+        };
+        const mesh: Mesh = .{
+            .attrs = @intCast(self.objects.mesh_attrs.items.len - 1),
+            .indices = try gpa.alloc(Mesh.Idx, tobj_mesh.num_indices),
+            .materials = try gpa.alloc(u32, tobj_mesh.num_faces),
+        };
+        self.objects.list.appendAssumeCapacity(new);
+        self.objects.meshes.appendAssumeCapacity(mesh);
+
+        for (0..tobj_mesh.num_indices) |i| {
+            mesh.indices[i] = .{
+                .vertex = @intCast(tobj_mesh.indices[i].vertex_index),
+                .normal = @intCast(tobj_mesh.indices[i].normal_index),
+            };
+        }
+        for (0..tobj_mesh.num_faces) |f| {
+            const material_id = tobj_mesh.material_ids[f];
+            mesh.materials[f] =
+                if (tobj_mesh.material_ids[f] != -1)
+                    @as(u32, @intCast(material_id)) + material_offset
+                else
+                    0;
+        }
+    }
+}

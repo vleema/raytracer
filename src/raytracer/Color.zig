@@ -6,27 +6,27 @@ const Real = vec.Real;
 
 const Color = @This();
 
-r: u8 = 0,
-g: u8 = 0,
-b: u8 = 0,
+r: u8 = 1,
+g: u8 = 1,
+b: u8 = 1,
 
 pub const Raw = union(enum) {
     hex: []const u8,
     rgb_u8: [3]u8,
     rgb_f32: [3]f32,
-
-    pub fn intoInternal(self: @This()) !Color {
-        return switch (self) {
-            .hex => |s| try Color.fromHex(s),
-            .rgb_u8 => |a| .{ .r = a[0], .g = a[1], .b = a[2] },
-            .rgb_f32 => |a| .{
-                .r = @intFromFloat(@min(a[0] * 255, 255)),
-                .g = @intFromFloat(@min(a[1] * 255, 255)),
-                .b = @intFromFloat(@min(a[2] * 255, 255)),
-            },
-        };
-    }
 };
+
+pub fn fromRaw(r: Raw) !Color {
+    return switch (r) {
+        .hex => |s| try Color.fromHex(s),
+        .rgb_u8 => |a| .{ .r = a[0], .g = a[1], .b = a[2] },
+        .rgb_f32 => |a| .{
+            .r = @intFromFloat(@min(a[0] * 255, 255)),
+            .g = @intFromFloat(@min(a[1] * 255, 255)),
+            .b = @intFromFloat(@min(a[2] * 255, 255)),
+        },
+    };
+}
 
 pub fn fromHex(str: ?[]const u8) !@This() {
     if (str == null or str.?.len == 0) return .{};
