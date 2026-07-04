@@ -26,6 +26,8 @@ pub fn render(
     const buf = try gpa.alloc(Color, self.film.width * self.film.height);
     defer gpa.free(buf);
 
+    const start = Io.Clock.awake.now(io);
+
     self.integrator.render(
         buf,
         world,
@@ -34,6 +36,9 @@ pub fn render(
         self.film.width,
         self.film.height,
     );
+
+    const elapsed: f64 = @floatFromInt(start.untilNow(io, .awake).nanoseconds);
+    std.log.info("elapsed time: {d:.2}s", .{elapsed / std.time.ns_per_s});
 
     return self.film.intoImg(gpa, io, dir, buf);
 }
