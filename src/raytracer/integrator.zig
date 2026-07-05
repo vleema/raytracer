@@ -5,7 +5,7 @@ const math = std.math;
 const vec = @import("vec");
 const Real = vec.Real;
 
-const Camera = @import("Camera.zig").Camera;
+const Camera = @import("camera.zig").Camera;
 const Color = @import("Color.zig");
 const Frame = @import("Look.zig").Frame;
 const Light = @import("Light.zig");

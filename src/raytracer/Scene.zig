@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
 const Color = @import("Color.zig");
-const Camera = @import("Camera.zig").Camera;
+const Camera = @import("camera.zig").Camera;
 const Film = @import("Film.zig");
 const Integrator = @import("integrator.zig").Integrator;
 const LookAt = @import("Look.zig");
