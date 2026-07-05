@@ -5,7 +5,7 @@ const Io = std.Io;
 const Color = @import("Color.zig");
 const Camera = @import("Camera.zig").Camera;
 const Film = @import("Film.zig");
-const Integrator = @import("Integrator.zig").Integrator;
+const Integrator = @import("integrator.zig").Integrator;
 const LookAt = @import("Look.zig");
 const World = @import("World.zig");
 
