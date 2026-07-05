@@ -28,13 +28,14 @@ pub fn render(
 
     const start = Io.Clock.awake.now(io);
 
-    self.integrator.render(
+    try self.integrator.render(
+        io,
         buf,
         world,
         &self.camera,
         &self.lookat.normalFrame(),
-        self.film.width,
         self.film.height,
+        self.film.width,
     );
 
     const elapsed: f64 = @floatFromInt(start.untilNow(io, .awake).nanoseconds);

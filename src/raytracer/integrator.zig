@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const math = std.math;
 
 const vec = @import("vec");
@@ -12,33 +13,70 @@ const Material = @import("Material.zig");
 const Ray = @import("Ray.zig");
 const World = @import("World.zig");
 
+const Tile = struct {
+    x_min: u32,
+    x_max: u32,
+    y_min: u32,
+    y_max: u32,
+};
+
 pub const Integrator = union(enum) {
     flat: Flat,
     blinn: Blinn,
 
     pub fn render(
         self: *const Integrator,
+        io: std.Io,
         buf: []Color,
         world: *const World,
         camera: *const Camera,
         frame: *const Frame,
-        width: u32,
         height: u32,
+        width: u32,
+    ) !void {
+        var group: Io.Group = .init;
+        errdefer group.cancel(io);
+        const tile_size = 16;
+        var y: u32 = 0;
+        while (y < height) : (y += tile_size) {
+            var x: u32 = 0;
+            while (x < width) : (x += tile_size) {
+                const tile: Tile = .{
+                    .x_min = x,
+                    .y_min = y,
+                    .x_max = @min(x + tile_size, width),
+                    .y_max = @min(y + tile_size, height),
+                };
+                group.async(io, writeTile, .{ self, buf, world, camera, frame, height, width, tile });
+            }
+        }
+        try group.await(io);
+    }
+
+    fn writeTile(
+        self: *const Integrator,
+        buf: []Color,
+        world: *const World,
+        camera: *const Camera,
+        frame: *const Frame,
+        img_height: u32,
+        img_width: u32,
+        tile: Tile,
     ) void {
-        for (0..height) |y| {
-            for (0..width) |x| {
-                const ray = camera.generateRay(@intCast(x), @intCast(y), width, height, frame);
+        for (tile.y_min..tile.y_max) |y| {
+            for (tile.x_min..tile.x_max) |x| {
+                const ray = camera.generateRay(@intCast(x), @intCast(y), img_width, img_height, frame);
                 const color = if (world.objHit(&ray, std.math.inf(f32))) |h|
                     self.li(world, ray, h, 0)
                 else
                     // TODO: Add texture background.
                     world.background.ptColor(
-                        width,
-                        height,
+                        img_width,
+                        img_height,
                         .{ @floatFromInt(x), @floatFromInt(y) },
                     );
 
-                buf[x + y * width] = color;
+                buf[x + y * img_width] = color;
             }
         }
     }

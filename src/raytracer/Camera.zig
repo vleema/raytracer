@@ -30,8 +30,7 @@ pub const Camera = union(enum) {
         const iy: f32 = @floatFromInt(img_y);
 
         return switch (self.*) {
-            .rectangular => |r| r.generateRay(ix, iy, w, h, frame),
-            .spherical => |s| s.generateRay(ix, iy, w, h, frame),
+            inline else => |v| v.generateRay(ix, iy, w, h, frame),
         };
     }
 };
