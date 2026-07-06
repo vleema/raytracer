@@ -91,13 +91,116 @@ pub const List = struct {
         }
         self.list.appendAssumeCapacity(new);
     }
+
+    /// A bound of an object and a reference to the object in the list.
+    pub const Bounded = struct {
+        bounds: Bounds,
+        ref: u32,
+    };
+
+    /// Returns the amount of objects that can be bounded.
+    ///
+    /// For example, meshes and spheres can be bounded but planes no.
+    pub fn boundableCount(self: *const List) usize {
+        return self.list.len - self.planes.items.len;
+    }
+
+    /// Bounds all the objects inside the list and returns an owned slice with all the bounds.
+    ///
+    /// This is useful for pre-calculating the bounds during BVH tree builds.
+    pub fn boundAll(self: *const List, gpa: Allocator) ![]Bounded {
+        const slice = self.list.slice();
+        const meshes = self.meshes.slice();
+        const bounded = try gpa.alloc(Bounded, self.boundableCount());
+        var idx: u32 = 0;
+        for (0..slice.len) |i| {
+            const object = slice.get(i);
+            // We cannot bound infinite planes so it's impossible to pre-calculate this.
+            if (object.tag == .plane) continue;
+
+            bounded[idx].bounds = switch (object.tag) {
+                .sphere => self.spheres.items[object.common.extra_idx].bounds(),
+                .mesh => blk: {
+                    const mesh = meshes.get(object.common.extra_idx);
+                    const attrs = self.mesh_attrs.items[mesh.attrs];
+                    break :blk mesh.bounds(&attrs);
+                },
+                else => unreachable,
+            };
+            bounded[idx].ref = @intCast(i);
+            idx += 1;
+        }
+        return bounded;
+    }
+};
+
+pub const Bounds = struct {
+    pmin: [3]f32 = @splat(math.inf(f32)),
+    pmax: [3]f32 = @splat(-math.inf(f32)),
+
+    /// Determines if a ray hits the bounding box or no.
+    ///
+    /// The algorithm is the slab method based on https://tavianator.com/2022/ray_box_boundary.html.
+    pub fn hits(
+        self: *const Bounds,
+        r: *const Ray,
+        inv_dir: Real(3),
+        tmax: f32,
+    ) bool {
+        var tmin: f32 = 0.0;
+        const t1 = vec.sub(3, f32, self.pmin, r.origin) * inv_dir;
+        const t2 = vec.sub(3, f32, self.pmax, r.origin) * inv_dir;
+        inline for (0..3) |d| tmin = @max(tmin, @min(@min(t1[d], t2[d]), tmax));
+        return tmin < tmax;
+    }
+
+    pub fn diagonal(self: *const Bounds) [3]f32 {
+        return vec.sub(3, f32, self.pmax, self.pmin);
+    }
+
+    pub fn maxDimension(self: *const Bounds) u8 {
+        const d = self.diagonal();
+        if (d[0] > d[1] and d[0] > d[2])
+            return 0;
+        if (d[1] > d[2])
+            return 1;
+        return 2;
+    }
+
+    pub fn merge(self: *const Bounds, other: *const Bounds) Bounds {
+        return .{
+            .pmin = @min(@as(Real(3), self.pmin), @as(Real(3), other.pmin)),
+            .pmax = @max(@as(Real(3), self.pmax), @as(Real(3), other.pmax)),
+        };
+    }
+
+    pub fn centroid(self: *const Bounds) [3]f32 {
+        return vec.mul_scalar(3, f32, 0.5, @as(Real(3), self.pmin) + self.pmax);
+    }
+
+    /// Normalizes a coordinate inside the bounds.
+    pub fn offset(self: *const Bounds, v: Real(3)) [3]f32 {
+        var o = v - self.pmin;
+        if (self.pmax[0] > self.pmin[0])
+            o[0] /= self.pmax[0] - self.pmin[0];
+        if (self.pmax[1] > self.pmin[1])
+            o[1] /= self.pmax[1] - self.pmin[1];
+        if (self.pmax[2] > self.pmin[2])
+            o[2] /= self.pmax[2] - self.pmin[2];
+        return o;
+    }
+
+    pub fn surfaceArea(self: *const Bounds) f32 {
+        const diag: Real(3) = vec.sub(3, f32, self.pmax, self.pmin);
+        return 2 * (diag[0] * diag[1] + diag[0] * diag[2] + diag[1] * diag[2]);
+    }
 };
 
 pub const Sphere = struct {
     center: [3]f32 = .{ -1.0, 0.5, 5.0 },
     radius: f32 = 0.4,
 
-    pub fn hit(self: *const @This(), r: *const Ray, tmin: f32, tmax: f32) ?Hit {
+    pub fn hit(self: *const Sphere, r: *const Ray, tmin: f32, tmax: f32) ?Hit {
         const oc = @as(Real(3), self.center) - @as(Real(3), r.origin);
         const a = vec.dot(3, f32, r.direction, r.direction);
         const h = vec.dot(3, f32, r.direction, oc);
@@ -114,6 +217,13 @@ pub const Sphere = struct {
         const normal = (@as(Real(3), r.at(t)) - @as(Real(3), self.center)) / @as(Real(3), @splat(self.radius));
 
         return .{ .t = t, .normal = normal };
+    }
+
+    pub fn bounds(self: *const Sphere) Bounds {
+        return .{
+            .pmin = self.center - @as(Real(3), @splat(self.radius)),
+            .pmax = self.center + @as(Real(3), @splat(self.radius)),
+        };
     }
 };
 
@@ -132,13 +242,13 @@ pub const Mesh = struct {
         normal: usize,
     };
 
-    pub const Triangle = struct {
+    const Triangle = struct {
         v1: [3]f32,
         v2: [3]f32,
         v3: [3]f32,
 
         /// Tries to find a intersection with a ray using Möller-Trumbore algorithm.
-        pub fn hit(
+        fn hit(
             self: *const @This(),
             r: *const Ray,
             tmin: f32,
@@ -201,12 +311,23 @@ pub const Mesh = struct {
         return result;
     }
 
-    pub fn triangle(self: *const Mesh, attrs: *const Attributes, idx: usize) Mesh.Triangle {
+    fn triangle(self: *const Mesh, attrs: *const Attributes, idx: usize) Mesh.Triangle {
         return .{
             .v1 = attrs.vertices[self.indices[idx * 3].vertex * 3 ..][0..3].*,
             .v2 = attrs.vertices[self.indices[idx * 3 + 1].vertex * 3 ..][0..3].*,
             .v3 = attrs.vertices[self.indices[idx * 3 + 2].vertex * 3 ..][0..3].*,
         };
+    }
+
+    pub fn bounds(self: *const Mesh, attrs: *const Attributes) Bounds {
+        var min: Real(3) = @splat(math.inf(f32));
+        var max: Real(3) = @splat(-math.inf(f32));
+        for (self.indices) |i| {
+            const v: Real(3) = attrs.vertices[i.vertex * 3 ..][0..3].*;
+            min = @min(min, v);
+            max = @max(max, v);
+        }
+        return .{ .pmin = min, .pmax = max };
     }
 };
 
@@ -243,6 +364,7 @@ pub const Hit = struct {
     face: usize = 0,
 };
 
+// TODO: Add support for raw meshes.
 pub const Raw = struct {
     inner: union(enum) {
         sphere: Sphere,
@@ -266,6 +388,15 @@ fn expectVecApproxEq(expected: [3]f32, actual: [3]f32) !void {
     for (expected, actual) |e, a| {
         try testing.expectApproxEqAbs(e, a, 1e-6);
     }
+}
+
+test "object list: boundAll returns owned empty slice" {
+    const objects = Object.List{};
+
+    const bounded = try objects.boundAll(testing.allocator);
+    defer testing.allocator.free(bounded);
+
+    try testing.expectEqual(@as(usize, 0), bounded.len);
 }
 
 test "sphere: ray from outside hits nearest surface" {

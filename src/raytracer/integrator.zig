@@ -66,7 +66,7 @@ pub const Integrator = union(enum) {
         for (tile.y_min..tile.y_max) |y| {
             for (tile.x_min..tile.x_max) |x| {
                 const ray = camera.generateRay(@intCast(x), @intCast(y), img_width, img_height, frame);
-                const color = if (world.objHit(&ray, std.math.inf(f32))) |h|
+                const color = if (world.hit(&ray, std.math.inf(f32))) |h|
                     self.li(world, ray, h, 0)
                 else
                     // TODO: Add texture background.
@@ -136,7 +136,7 @@ pub const Blinn = struct {
                 vec.mul_scalar(3, f32, 2 * vec.dot(3, f32, ray.direction, hit.normal), hit.normal);
             const reflect_origin = hit_pt + @as(Real(3), @splat(0.001)) * hit.normal;
             const reflected: Ray = .{ .direction = direction, .origin = reflect_origin };
-            if (world.objHit(&reflected, math.inf(f32))) |h| {
+            if (world.hit(&reflected, math.inf(f32))) |h| {
                 light_contrib += blinn.mirror * self.li(world, reflected, h, depth + 1).toReal();
             }
         }
@@ -198,7 +198,7 @@ pub const Blinn = struct {
 
         const shadow_origin = hit_pt + @as(Real(3), @splat(0.001)) * normal;
         const shadow_ray = Ray{ .origin = shadow_origin, .direction = light_dir };
-        if (world.objHit(&shadow_ray, shadow_max)) |_| return @splat(0);
+        if (world.hit(&shadow_ray, shadow_max)) |_| return @splat(0);
 
         const glossiness = attenuated.glossiness;
         const specular = attenuated.specular;

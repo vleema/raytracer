@@ -1,39 +1,35 @@
 const std = @import("std");
+const math = std.math;
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
-const MultiArrayList = std.MultiArrayList;
-const eql = std.mem.eql;
 
 const obj = @import("obj");
 const pre = @import("pre");
-const vec = @import("vec");
 
+const Bvh = @import("Bvh.zig");
 const Color = @import("Color.zig");
 const lerp = @import("lerp.zig");
 const Light = @import("Light.zig");
-const Point = Light.Point;
-const Directional = Light.Directional;
-const Spotlight = Light.Spotlight;
 const Material = @import("Material.zig");
-const Blinn = Material.Blinn;
-const Flat = Material.Flat;
 const Object = @import("Object.zig");
-const Plane = Object.Plane;
-const Sphere = Object.Sphere;
 const Mesh = Object.Mesh;
 const Ray = @import("Ray.zig");
 
 const World = @This();
 
 background: Background = .{ .single_color = .{} },
-materials: Materials = .{},
-objects: Objects = .{},
-lights: Lights = .{},
+materials: Material.List = .{},
+objects: Object.List = .{},
+lights: Light.List = .{},
+aggregator: Aggregator = .bvh,
+bvh: Bvh = .{},
+
+const Aggregator = enum { bvh, list };
 
 pub fn deinit(self: *@This(), gpa: Allocator) void {
     self.objects.deinit(gpa);
     self.materials.deinit(gpa);
     self.lights.deinit(gpa);
+    self.bvh.deinit(gpa);
 }
 
 pub const Hit = struct {
@@ -42,7 +38,39 @@ pub const Hit = struct {
     material: Material,
 };
 
-pub fn objHit(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
+pub fn hit(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
+    return switch (self.aggregator) {
+        .bvh => self.hitBvh(r, max_dist),
+        .list => self.hitList(r, max_dist),
+    };
+}
+
+fn hitBvh(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
+    var closest_hit = self.bvh.hit(Hit, self, World.hitObj, self.objects, r, max_dist);
+    var tmax = if (closest_hit) |v|
+        v.t
+    else
+        max_dist;
+
+    // FIX: This is unfortunate, we shouldn't need to iterate all over again just for the planes...
+    const objects = self.objects.list.slice();
+    const tags = objects.items(.tag);
+    const commons = objects.items(.common);
+    for (tags, commons) |t, c| {
+        if (t != .plane) continue;
+        const h = self.objects.planes.items[c.extra_idx].hit(r, 0, tmax) orelse continue;
+        tmax = h.t;
+        closest_hit = .{
+            .t = h.t,
+            .normal = h.normal,
+            .material = self.materials.list.get(c.material),
+        };
+    }
+
+    return closest_hit;
+}
+
+fn hitList(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
     const tmin = 0;
     var tmax = max_dist;
     var closest_hit: ?Hit = null;
@@ -51,27 +79,40 @@ pub fn objHit(self: *const World, r: *const Ray, max_dist: f32) ?Hit {
     const tags = slice.items(.tag);
     const commons = slice.items(.common);
     for (tags, commons) |tag, c| {
-        const hit = switch (tag) {
-            .sphere => self.objects.spheres.items[c.extra_idx].hit(r, tmin, tmax),
-            .plane => self.objects.planes.items[c.extra_idx].hit(r, tmin, tmax),
-            .mesh => b: {
-                const mesh = self.objects.meshes.get(c.extra_idx);
-                const attrs = self.objects.mesh_attrs.items[mesh.attrs];
-                break :b mesh.hit(&attrs, r, tmin, tmax);
-            },
-        } orelse continue;
-        const material = switch (tag) {
-            .mesh => self.objects.meshes.get(c.extra_idx).materials[hit.face],
-            else => c.material,
-        };
-        closest_hit = .{
-            .t = hit.t,
-            .normal = hit.normal,
-            .material = self.materials.list.get(material),
-        };
-        tmax = hit.t;
+        const h = self.hitObj(&Object{ .tag = tag, .common = c }, r, tmin, tmax) orelse continue;
+        closest_hit = h;
+        tmax = h.t;
     }
     return closest_hit orelse null;
+}
+
+pub fn hitObj(
+    self: *const World,
+    object: *const Object,
+    r: *const Ray,
+    tmin: f32,
+    tmax: f32,
+) ?Hit {
+    const h = switch (object.tag) {
+        .sphere => self.objects.spheres.items[object.common.extra_idx].hit(r, tmin, tmax),
+        .plane => self.objects.planes.items[object.common.extra_idx].hit(r, tmin, tmax),
+        .mesh => b: {
+            const mesh = self.objects.meshes.get(object.common.extra_idx);
+            const attrs = self.objects.mesh_attrs.items[mesh.attrs];
+            break :b mesh.hit(&attrs, r, tmin, tmax);
+        },
+    } orelse return null;
+
+    const material = switch (object.tag) {
+        .mesh => self.objects.meshes.get(object.common.extra_idx).materials[h.face],
+        else => object.common.material,
+    };
+
+    return .{
+        .t = h.t,
+        .normal = h.normal,
+        .material = self.materials.list.get(material),
+    };
 }
 
 pub const Raw = struct {
@@ -80,6 +121,7 @@ pub const Raw = struct {
     objects: []Object.Raw = &.{},
     lights: []Light.Raw = &.{},
     obj_files: []const []const u8 = &.{},
+    aggregator: Aggregator = .bvh,
 
     pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !World {
         var world: World = .{};
@@ -89,6 +131,7 @@ pub const Raw = struct {
         world.materials = try .fromRaw(gpa, self.materials);
         world.objects = try .fromRaw(gpa, self.objects, &world.materials);
         world.lights = try .fromRaw(gpa, self.lights);
+        world.aggregator = self.aggregator;
 
         for (self.obj_files) |f| {
             const path = try pre.resolvePath(gpa, source_path, f);
@@ -99,6 +142,9 @@ pub const Raw = struct {
             std.log.err("objects have no material defined", .{});
             return error.NoMaterial;
         }
+
+        if (world.aggregator == .bvh)
+            world.bvh = try .build(gpa, &world.objects);
 
         return world;
     }
