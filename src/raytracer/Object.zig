@@ -1,10 +1,17 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const MultiArrayList = std.MultiArrayList;
+const ArrayList = std.ArrayList;
+const math = std.math;
 const testing = std.testing;
 
 const vec = @import("vec");
 const Real = vec.Real;
 
 const Ray = @import("Ray.zig");
+const Material = @import("Material.zig");
+
+const Object = @This();
 
 tag: Tag,
 common: Common = .{},
@@ -20,6 +27,70 @@ pub const Common = struct {
     // FIX: Having this field 0 as default is not ideal, one can skip specifying
     // a material and the program will silently use the first one available.
     material: u32 = 0,
+};
+
+pub const List = struct {
+    list: MultiArrayList(Object) = .empty,
+    spheres: ArrayList(Sphere) = .empty,
+    planes: ArrayList(Plane) = .empty,
+    meshes: MultiArrayList(Mesh) = .empty,
+    mesh_attrs: ArrayList(Mesh.Attributes) = .empty,
+
+    pub fn deinit(self: *List, gpa: Allocator) void {
+        self.list.deinit(gpa);
+        self.spheres.deinit(gpa);
+        self.planes.deinit(gpa);
+        for (self.meshes.items(.indices)) |i| gpa.free(i);
+        for (self.mesh_attrs.items) |a| {
+            gpa.free(a.vertices);
+            gpa.free(a.normals);
+        }
+        self.meshes.deinit(gpa);
+        self.mesh_attrs.deinit(gpa);
+    }
+
+    pub fn fromRaw(gpa: Allocator, raw: []const Object.Raw, materials: *const Material.List) !List {
+        var this = @This(){};
+        errdefer this.deinit(gpa);
+        try this.list.ensureUnusedCapacity(gpa, raw.len);
+        for (raw) |r| try this.appendRawAssumeCapacity(gpa, r, materials);
+        return this;
+    }
+
+    fn appendRawAssumeCapacity(
+        self: *List,
+        gpa: Allocator,
+        raw: Object.Raw,
+        materials: *const Material.List,
+    ) !void {
+        var new: Object = .{ .tag = raw.inner.intoTag() };
+        if (raw.material) |raw_material| {
+            var found = false;
+            const names = materials.list.items(.name);
+            for (names, 0..) |n, i| {
+                if (std.mem.eql(u8, n, raw_material)) {
+                    new.common.material = @intCast(i);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                std.log.err("unknown material name: {s}", .{raw_material});
+                return error.UnknownMaterial;
+            }
+        }
+        switch (raw.inner) {
+            .sphere => |s| {
+                new.common.extra_idx = @intCast(self.spheres.items.len);
+                try self.spheres.append(gpa, s);
+            },
+            .plane => |p| {
+                new.common.extra_idx = @intCast(self.planes.items.len);
+                try self.planes.append(gpa, p.intoInternal());
+            },
+        }
+        self.list.appendAssumeCapacity(new);
+    }
 };
 
 pub const Sphere = struct {

@@ -1,3 +1,8 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const MultiArrayList = std.MultiArrayList;
+const ArrayList = std.ArrayList;
+
 const vec = @import("vec");
 
 const Material = @import("Material.zig");
@@ -43,6 +48,54 @@ pub const Common = struct {
             .mirror = material.mirror,
             .glossiness = material.glossiness,
         };
+    }
+};
+
+pub const List = struct {
+    list: MultiArrayList(Light) = .empty,
+    directional: ArrayList(Directional) = .empty,
+    point: ArrayList(Point) = .empty,
+    spotlight: ArrayList(Spotlight) = .empty,
+
+    pub fn deinit(self: *List, gpa: Allocator) void {
+        self.list.deinit(gpa);
+        self.directional.deinit(gpa);
+        self.point.deinit(gpa);
+        self.spotlight.deinit(gpa);
+    }
+
+    pub fn fromRaw(gpa: Allocator, raw: []const Light.Raw) !List {
+        var this: List = .{};
+        errdefer this.deinit(gpa);
+        try this.list.ensureUnusedCapacity(gpa, raw.len);
+        for (raw) |r| try this.appendRawAssumeCapacity(gpa, r);
+        return this;
+    }
+
+    fn appendRawAssumeCapacity(self: *List, gpa: Allocator, r: Light.Raw) !void {
+        // SAFETY: `extra_idx` is defined by the switch below.
+        var extra_idx: u32 = undefined;
+        switch (r.inner) {
+            .ambient => {},
+            .directional => |d| {
+                extra_idx = @intCast(self.directional.items.len);
+                try self.directional.append(gpa, d);
+            },
+            .point => |p| {
+                extra_idx = @intCast(self.point.items.len);
+                try self.point.append(gpa, p);
+            },
+            .spotlight => |p| {
+                var l = p;
+                l.cutoff = @cos(vec.angleToRad(p.cutoff));
+                l.falloff = @cos(vec.angleToRad(p.falloff));
+                extra_idx = @intCast(self.spotlight.items.len);
+                try self.spotlight.append(gpa, l);
+            },
+        }
+        var item = try r.intoInternal();
+        item.common.extra_idx = extra_idx;
+        self.list.appendAssumeCapacity(item);
     }
 };
 
