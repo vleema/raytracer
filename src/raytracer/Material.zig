@@ -30,6 +30,13 @@ pub const List = struct {
         self.flat.deinit(gpa);
     }
 
+    pub fn find(self: *const Material.List, name: []const u8) ?usize {
+        const names = self.list.items(.name);
+        return for (names, 0..) |n, i| {
+            if (std.mem.eql(u8, name, n)) break i;
+        } else null;
+    }
+
     pub fn fromRaw(gpa: Allocator, raw: []const Material.Raw) !@This() {
         var this = @This(){};
         errdefer this.deinit(gpa);

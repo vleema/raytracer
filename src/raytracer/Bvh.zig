@@ -180,10 +180,10 @@ const Build = struct {
 
         // Partition objects into two sets and build the children.
         var mid = objects.len / 2;
-        if (objects.len == 2 and
-            objects[1].bounds.centroid()[dim] < objects[0].bounds.centroid()[dim])
-        {
-            std.mem.swap(Bounded, &objects[0], &objects[1]);
+        if (objects.len == 2) {
+            if (objects[1].bounds.centroid()[dim] < objects[0].bounds.centroid()[dim]) {
+                std.mem.swap(Bounded, &objects[0], &objects[1]);
+            }
         } else {
             // Now we implement the SAH.
             // First we wrap the objects into buckets to reduce the amounts of splits.
@@ -351,8 +351,9 @@ const Build = struct {
             if (buckets[s].count > 0) {
                 box = box.merge(&buckets[s].bounds);
                 count += buckets[s].count;
-                costs[s] = @as(f32, @floatFromInt(count)) * box.surfaceArea();
             }
+            if (count > 0)
+                costs[s] = @as(f32, @floatFromInt(count)) * box.surfaceArea();
         }
         // Computes the right side of each split.
         count = 0;
@@ -362,15 +363,16 @@ const Build = struct {
             if (buckets[s].count > 0) {
                 box = box.merge(&buckets[s].bounds);
                 count += buckets[s].count;
-                costs[s - 1] += @as(f32, @floatFromInt(count)) * box.surfaceArea();
             }
+            if (count > 0)
+                costs[s - 1] += @as(f32, @floatFromInt(count)) * box.surfaceArea();
         }
         return costs;
     }
 
     fn mergeBounds(objects: []Object.List.Bounded) Bounds {
         var min: Real(3) = @splat(math.inf(f32));
-        var max: Real(3) = @splat(math.floatMin(f32));
+        var max: Real(3) = @splat(-math.inf(f32));
         for (objects) |o| {
             min = @min(min, @as(Real(3), o.bounds.pmin));
             max = @max(max, @as(Real(3), o.bounds.pmax));
@@ -380,7 +382,7 @@ const Build = struct {
 
     fn mergeCentroids(objects: []Object.List.Bounded) Bounds {
         var min: Real(3) = @splat(math.inf(f32));
-        var max: Real(3) = @splat(math.floatMin(f32));
+        var max: Real(3) = @splat(-math.inf(f32));
         for (objects) |o| {
             const c: Real(3) = o.bounds.centroid();
             min = @min(min, c);

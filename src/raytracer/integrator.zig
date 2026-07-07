@@ -157,7 +157,7 @@ pub const Blinn = struct {
                     material.ambient,
                     light.common.intensity,
                 }),
-                // TODO: Use shadow ray as bounding box of objects.
+                // TODO: Use bouding box as shadow ray.
                 .directional => blk: {
                     const payload = world.lights.directional.items[light.common.extra_idx];
                     const light_dir = vec.normalize(3, f32, vec.sub(3, f32, payload.from, payload.to));
@@ -165,7 +165,7 @@ pub const Blinn = struct {
                         light_dir,
                         light.common.intensity,
                         material,
-                        std.math.inf(f32),
+                        math.inf(f32),
                     };
                 },
                 .point => blk: {

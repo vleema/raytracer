@@ -96,22 +96,17 @@ pub fn hitObj(
     const h = switch (object.tag) {
         .sphere => self.objects.spheres.items[object.common.extra_idx].hit(r, tmin, tmax),
         .plane => self.objects.planes.items[object.common.extra_idx].hit(r, tmin, tmax),
-        .mesh => b: {
-            const mesh = self.objects.meshes.get(object.common.extra_idx);
+        .triangle => b: {
+            const triangle = self.objects.triangles.items[object.common.extra_idx];
+            const mesh = self.objects.meshes.get(triangle.mesh);
             const attrs = self.objects.mesh_attrs.items[mesh.attrs];
-            break :b mesh.hit(&attrs, r, tmin, tmax);
+            break :b mesh.hit(&attrs, triangle.idx, r, tmin, tmax);
         },
     } orelse return null;
-
-    const material = switch (object.tag) {
-        .mesh => self.objects.meshes.get(object.common.extra_idx).materials[h.face],
-        else => object.common.material,
-    };
-
     return .{
         .t = h.t,
         .normal = h.normal,
-        .material = self.materials.list.get(material),
+        .material = self.materials.list.get(object.common.material),
     };
 }
 
