@@ -120,7 +120,6 @@ pub const Raw = struct {
     materials: []Material.Raw = &.{},
     objects: []Object.Raw = &.{},
     lights: []Light.Raw = &.{},
-    obj_files: []const []const u8 = &.{},
     aggregator: Aggregator = .bvh,
 
     pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !World {
@@ -129,14 +128,9 @@ pub const Raw = struct {
 
         world.background = try self.background.intoInternal();
         world.materials = try .fromRaw(gpa, self.materials);
-        world.objects = try .fromRaw(gpa, self.objects, &world.materials);
+        world.objects = try .fromRaw(gpa, self.objects, &world.materials, source_path);
         world.lights = try .fromRaw(gpa, self.lights);
         world.aggregator = self.aggregator;
-
-        for (self.obj_files) |f| {
-            const path = try pre.resolvePath(gpa, source_path, f);
-            try world.loadObjFile(gpa, path);
-        }
 
         if (world.materials.list.len == 0 and world.objects.list.len > 0) {
             std.log.err("objects have no material defined", .{});
@@ -149,88 +143,6 @@ pub const Raw = struct {
         return world;
     }
 };
-
-pub fn loadObjFile(self: *World, gpa: Allocator, filename: []const u8) !void {
-    var scene: obj.tobj_scene_f = .{};
-    var cfg = obj.tobj_default_config();
-    var diag: obj.tobj_diag = .{};
-
-    defer obj.tobj_scene_free_f(&scene);
-    defer obj.tobj_diag_free(&diag, null);
-
-    if (obj.tobj_load_obj_from_file_f(&scene, @ptrCast(filename), &cfg, &diag) != obj.TOBJ_OK) {
-        if (diag.err != null) std.log.err("{s}", .{diag.err});
-        return error.ErrorLoadingObjFile;
-    }
-
-    // Load the meshes attributes.
-    const mesh_attrs: Mesh.Attributes = .{
-        .vertices = try gpa.alloc(f32, scene.attrib.vertices.count),
-        .normals = try gpa.alloc(f32, scene.attrib.normals.count),
-    };
-    try self.objects.mesh_attrs.append(gpa, mesh_attrs);
-    try self.materials.list.ensureUnusedCapacity(gpa, scene.num_materials);
-    try self.materials.blinn.ensureUnusedCapacity(gpa, scene.num_materials);
-    try self.objects.meshes.ensureUnusedCapacity(gpa, scene.num_shapes);
-    try self.objects.list.ensureUnusedCapacity(gpa, scene.num_shapes);
-
-    @memcpy(mesh_attrs.vertices, scene.attrib.vertices.ptr);
-    @memcpy(mesh_attrs.normals, scene.attrib.normals.ptr);
-
-    const material_offset: u32 = @intCast(self.materials.list.len);
-
-    // Add the materials to the world.
-    for (0..scene.num_materials) |m| {
-        const material = scene.materials[m];
-        const new: Material = .{
-            .tag = .blinn,
-            .extra_idx = @intCast(self.materials.blinn.items.len),
-            .name = try gpa.dupe(u8, std.mem.span(material.name)),
-        };
-        const blinn: Material.Blinn = .{
-            // TODO: Add support for the other obj file fields.
-            .ambient = material.ambient,
-            .diffuse = material.diffuse,
-            .specular = material.specular,
-            .mirror = @splat(material.metallic), // NOTE: There's no mirror field in the mtl repr.
-            .glossiness = 1 - material.roughness,
-        };
-        // FIX: Append a namespace or sort a merge strategy for materials names.
-        self.materials.list.appendAssumeCapacity(new);
-        self.materials.blinn.appendAssumeCapacity(blinn);
-    }
-
-    // Add the meshes.
-    for (0..scene.num_shapes) |s| {
-        const tobj_mesh = scene.shapes[s].mesh;
-        const new: Object = .{
-            .tag = .mesh,
-            .common = .{ .extra_idx = @intCast(self.objects.meshes.len) },
-        };
-        const mesh: Mesh = .{
-            .attrs = @intCast(self.objects.mesh_attrs.items.len - 1),
-            .indices = try gpa.alloc(Mesh.Idx, tobj_mesh.num_indices),
-            .materials = try gpa.alloc(u32, tobj_mesh.num_faces),
-        };
-        self.objects.list.appendAssumeCapacity(new);
-        self.objects.meshes.appendAssumeCapacity(mesh);
-
-        for (0..tobj_mesh.num_indices) |i| {
-            mesh.indices[i] = .{
-                .vertex = @intCast(tobj_mesh.indices[i].vertex_index),
-                .normal = @intCast(tobj_mesh.indices[i].normal_index),
-            };
-        }
-        for (0..tobj_mesh.num_faces) |f| {
-            const material_id = tobj_mesh.material_ids[f];
-            mesh.materials[f] =
-                if (tobj_mesh.material_ids[f] != -1)
-                    @as(u32, @intCast(material_id)) + material_offset
-                else
-                    0;
-        }
-    }
-}
 
 const Background = union(enum) {
     single_color: struct {

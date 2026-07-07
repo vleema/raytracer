@@ -5,11 +5,13 @@ const ArrayList = std.ArrayList;
 const math = std.math;
 const testing = std.testing;
 
+const pre = @import("pre");
+const obj = @import("obj");
 const vec = @import("vec");
 const Real = vec.Real;
 
-const Ray = @import("Ray.zig");
 const Material = @import("Material.zig");
+const Ray = @import("Ray.zig");
 
 const Object = @This();
 
@@ -49,11 +51,16 @@ pub const List = struct {
         self.mesh_attrs.deinit(gpa);
     }
 
-    pub fn fromRaw(gpa: Allocator, raw: []const Object.Raw, materials: *const Material.List) !List {
+    pub fn fromRaw(
+        gpa: Allocator,
+        raw: []const Object.Raw,
+        materials: *Material.List,
+        source_path: []const u8,
+    ) !List {
         var this = @This(){};
         errdefer this.deinit(gpa);
         try this.list.ensureUnusedCapacity(gpa, raw.len);
-        for (raw) |r| try this.appendRawAssumeCapacity(gpa, r, materials);
+        for (raw) |r| try this.appendRawAssumeCapacity(gpa, r, materials, source_path);
         return this;
     }
 
@@ -61,7 +68,8 @@ pub const List = struct {
         self: *List,
         gpa: Allocator,
         raw: Object.Raw,
-        materials: *const Material.List,
+        materials: *Material.List,
+        source_path: []const u8,
     ) !void {
         var new: Object = .{ .tag = raw.inner.intoTag() };
         if (raw.material) |raw_material| {
@@ -88,8 +96,100 @@ pub const List = struct {
                 new.common.extra_idx = @intCast(self.planes.items.len);
                 try self.planes.append(gpa, p.intoInternal());
             },
+            .mesh => |m| {
+                const path = try pre.resolvePath(gpa, source_path, m);
+                try self.loadObjFile(gpa, materials, path);
+                return;
+            },
         }
         self.list.appendAssumeCapacity(new);
+    }
+
+    pub fn loadObjFile(
+        self: *List,
+        gpa: Allocator,
+        materials: *Material.List,
+        filename: []const u8,
+    ) !void {
+        var scene: obj.tobj_scene_f = .{};
+        var cfg = obj.tobj_default_config();
+        var diag: obj.tobj_diag = .{};
+
+        defer obj.tobj_scene_free_f(&scene);
+        defer obj.tobj_diag_free(&diag, null);
+
+        if (obj.tobj_load_obj_from_file_f(&scene, @ptrCast(filename), &cfg, &diag) != obj.TOBJ_OK) {
+            if (diag.err != null) std.log.err("{s}", .{diag.err});
+            return error.ErrorLoadingObjFile;
+        }
+
+        // Load the meshes attributes.
+        const mesh_attrs: Mesh.Attributes = .{
+            .vertices = try gpa.alloc(f32, scene.attrib.vertices.count),
+            .normals = try gpa.alloc(f32, scene.attrib.normals.count),
+        };
+        try self.mesh_attrs.append(gpa, mesh_attrs);
+        try materials.list.ensureUnusedCapacity(gpa, scene.num_materials);
+        try materials.blinn.ensureUnusedCapacity(gpa, scene.num_materials);
+        try self.meshes.ensureUnusedCapacity(gpa, scene.num_shapes);
+        try self.list.ensureUnusedCapacity(gpa, scene.num_shapes);
+
+        @memcpy(mesh_attrs.vertices, scene.attrib.vertices.ptr);
+        @memcpy(mesh_attrs.normals, scene.attrib.normals.ptr);
+
+        const material_offset: u32 = @intCast(materials.list.len);
+
+        // Add the materials.
+        for (0..scene.num_materials) |m| {
+            const material = scene.materials[m];
+            const new: Material = .{
+                .tag = .blinn,
+                .extra_idx = @intCast(materials.blinn.items.len),
+                .name = try gpa.dupe(u8, std.mem.span(material.name)),
+            };
+            const blinn: Material.Blinn = .{
+                // TODO: Add support for the other obj file fields.
+                .ambient = material.ambient,
+                .diffuse = material.diffuse,
+                .specular = material.specular,
+                .mirror = @splat(material.metallic), // NOTE: There's no mirror field in the mtl repr.
+                .glossiness = 1 - material.roughness,
+            };
+            // FIX: Append a namespace or sort a merge strategy for materials names.
+            materials.list.appendAssumeCapacity(new);
+            materials.blinn.appendAssumeCapacity(blinn);
+        }
+
+        // Add the meshes.
+        for (0..scene.num_shapes) |s| {
+            const tobj_mesh = scene.shapes[s].mesh;
+            const new: Object = .{
+                .tag = .mesh,
+                .common = .{ .extra_idx = @intCast(self.meshes.len) },
+            };
+            const mesh: Mesh = .{
+                .attrs = @intCast(self.mesh_attrs.items.len - 1),
+                .indices = try gpa.alloc(Mesh.Idx, tobj_mesh.num_indices),
+                .materials = try gpa.alloc(u32, tobj_mesh.num_faces),
+            };
+            self.list.appendAssumeCapacity(new);
+            self.meshes.appendAssumeCapacity(mesh);
+
+            for (0..tobj_mesh.num_indices) |i| {
+                mesh.indices[i] = .{
+                    .vertex = @intCast(tobj_mesh.indices[i].vertex_index),
+                    .normal = @intCast(tobj_mesh.indices[i].normal_index),
+                };
+            }
+            for (0..tobj_mesh.num_faces) |f| {
+                const material_id = tobj_mesh.material_ids[f];
+                mesh.materials[f] =
+                    if (tobj_mesh.material_ids[f] != -1)
+                        @as(u32, @intCast(material_id)) + material_offset
+                    else
+                        0;
+            }
+        }
     }
 
     /// A bound of an object and a reference to the object in the list.
@@ -364,20 +464,22 @@ pub const Hit = struct {
     face: usize = 0,
 };
 
-// TODO: Add support for raw meshes.
 pub const Raw = struct {
+    // TODO: Make this material override the mesh material.
+    material: ?[]const u8 = null,
     inner: union(enum) {
         sphere: Sphere,
         plane: Plane.Raw,
+        mesh: []const u8,
 
         pub fn intoTag(self: @This()) Tag {
             return switch (self) {
                 .sphere => .sphere,
                 .plane => .plane,
+                .mesh => .mesh,
             };
         }
     },
-    material: ?[]const u8 = null,
 
     pub fn intoInternal(self: @This()) Raw {
         return self;

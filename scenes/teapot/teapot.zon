@@ -21,6 +21,7 @@
         },
     },
     .world = .{
+        .aggregator = .bvh,
         .background = .{
             .four_colors = .{
                 .bl = .{ .rgb_f32 = .{ 0.6, 0.8, 1 } },
@@ -43,9 +44,13 @@
                 .attenuation = .{ .constant = 1, .linear = 0, .quadratic = 0 },
             },
         },
-        .obj_files = .{
-            "teapot.obj",
-            "plane.obj",
+        .objects = .{
+            .{
+                .inner = .{ .mesh = "teapot.obj" },
+            },
+            .{
+                .inner = .{ .mesh = "plane.obj" },
+            },
         },
     },
 }
