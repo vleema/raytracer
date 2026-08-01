@@ -16,11 +16,11 @@ pub const Raw = struct {
     scene: Scene,
     world: World.Raw,
 
-    pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !RT3 {
+    pub fn intoInternal(self: @This(), gpa: Allocator, io: Io, source_path: []const u8) !RT3 {
         var rt: RT3 = .{};
         errdefer rt.deinit(gpa);
         rt.scene = self.scene;
-        rt.world = try self.world.intoInternal(gpa, source_path);
+        rt.world = try self.world.intoInternal(gpa, io, source_path);
         return rt;
     }
 };
@@ -52,7 +52,7 @@ pub fn fromZonFile(gpa: Allocator, io: Io, dir: Io.Dir, path: []const u8) !RT3 {
         }
         return err;
     };
-    return try parsed.intoInternal(gpa, path);
+    return try parsed.intoInternal(gpa, io, path);
 }
 
 pub fn render(self: *RT3, gpa: Allocator, io: Io, dir: Io.Dir) !void {

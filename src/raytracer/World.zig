@@ -117,13 +117,18 @@ pub const Raw = struct {
     lights: []Light.Raw = &.{},
     aggregator: Aggregator = .bvh,
 
-    pub fn intoInternal(self: @This(), gpa: Allocator, source_path: []const u8) !World {
+    pub fn intoInternal(
+        self: @This(),
+        gpa: Allocator,
+        io: std.Io,
+        source_path: []const u8,
+    ) !World {
         var world: World = .{};
         errdefer world.deinit(gpa);
 
         world.background = try self.background.intoInternal();
         world.materials = try .fromRaw(gpa, self.materials);
-        world.objects = try .fromRaw(gpa, self.objects, &world.materials, source_path);
+        world.objects = try .fromRaw(gpa, io, self.objects, &world.materials, source_path);
         world.lights = try .fromRaw(gpa, self.lights);
         world.aggregator = self.aggregator;
 

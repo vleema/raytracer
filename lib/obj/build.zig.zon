@@ -1,7 +1,0 @@
-.{
-    .name = .obj,
-    .version = "0.0.1",
-    .minimum_zig_version = "0.16.0",
-    .paths = .{""},
-    .fingerprint = 0x4666d46c0f9c3eac,
-}

@@ -2,22 +2,22 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const MultiArrayList = std.MultiArrayList;
 const ArrayList = std.ArrayList;
+const Io = std.Io;
 const math = std.math;
 const testing = std.testing;
 
-const pre = @import("pre");
 const obj = @import("obj");
+const pre = @import("pre");
 const vec = @import("vec");
-const Matrix4 = vec.Matrix4;
 const Real = vec.Real;
 
 const Material = @import("Material.zig");
 const Ray = @import("Ray.zig");
 
-const Object = @This();
-
 tag: Tag,
 common: Common = .{},
+
+const Object = @This();
 
 pub const Tag = enum {
     sphere,
@@ -68,6 +68,7 @@ pub const List = struct {
 
     pub fn fromRaw(
         gpa: Allocator,
+        io: Io,
         raw: []const Object.Raw,
         materials: *Material.List,
         source_path: []const u8,
@@ -75,13 +76,14 @@ pub const List = struct {
         var this = @This(){};
         errdefer this.deinit(gpa);
         try this.list.ensureUnusedCapacity(gpa, raw.len);
-        for (raw) |r| try this.appendRawAssumeCapacity(gpa, r, materials, source_path);
+        for (raw) |r| try this.appendRawAssumeCapacity(gpa, io, r, materials, source_path);
         return this;
     }
 
     fn appendRawAssumeCapacity(
         self: *List,
         gpa: Allocator,
+        io: Io,
         raw: Object.Raw,
         materials: *Material.List,
         source_path: []const u8,
@@ -98,7 +100,7 @@ pub const List = struct {
             },
             .mesh => |m| {
                 const path = try gpa.dupeSentinel(u8, try pre.resolvePath(gpa, source_path, m), 0);
-                try self.loadObjFile(gpa, materials, path);
+                try self.loadObjFile(gpa, io, path);
                 return;
             },
         }
@@ -115,97 +117,44 @@ pub const List = struct {
     pub fn loadObjFile(
         self: *List,
         gpa: Allocator,
-        materials: *Material.List,
-        filename: [*c]const u8,
+        io: Io,
+        file_name: []const u8,
     ) !void {
-        var scene: obj.tobj_scene_f = .{};
-        var cfg = obj.tobj_default_config();
-        var diag: obj.tobj_diag = .{};
-
-        defer obj.tobj_scene_free_f(&scene);
-        defer obj.tobj_diag_free(&diag, null);
-
-        const result = obj.tobj_load_obj_from_file_f(&scene, filename, &cfg, &diag);
-        if (result != obj.TOBJ_OK) {
-            std.log.err("obj loader failed with error '{}'", .{result});
-            if (diag.err != null) std.log.err("{s}", .{diag.err});
-            return error.ErrorLoadingObjFile;
-        }
-
-        var triangle_count: usize = 0;
-        for (0..scene.num_shapes) |s|
-            triangle_count += scene.shapes[s].mesh.num_indices / 3;
-
-        try self.triangles.ensureUnusedCapacity(gpa, triangle_count);
-        try self.list.ensureUnusedCapacity(gpa, triangle_count);
-        try self.meshes.ensureUnusedCapacity(gpa, scene.num_shapes);
-        try materials.list.ensureUnusedCapacity(gpa, scene.num_materials);
-        try materials.blinn.ensureUnusedCapacity(gpa, scene.num_materials);
-
-        // Load the meshes attributes.
-        const mesh_attrs: Mesh.Attributes = .{
-            .vertices = try gpa.alloc(f32, scene.attrib.vertices.count),
-            .normals = try gpa.alloc(f32, scene.attrib.normals.count),
+        var diagnostic: obj.ErrorDiagnostic = undefined;
+        const cwd = Io.Dir.cwd();
+        const obj_parsed = obj.loadObjFile(f32, gpa, io, cwd, file_name, &diagnostic) catch |err| {
+            std.log.err("unable to parse obj file: '{s}'", .{file_name});
+            diagnostic.logErr();
+            return err;
         };
-        try self.mesh_attrs.append(gpa, mesh_attrs);
+        defer obj_parsed.deinit(gpa);
 
-        @memcpy(mesh_attrs.vertices, scene.attrib.vertices.ptr);
-        @memcpy(mesh_attrs.normals, scene.attrib.normals.ptr);
+        try self.triangles.ensureUnusedCapacity(gpa, obj_parsed.face_count * 3);
+        try self.list.ensureUnusedCapacity(gpa, obj_parsed.face_count * 3);
+        try self.meshes.ensureUnusedCapacity(gpa, obj_parsed.meshes.len);
+        const mesh_attributes: Mesh.Attributes = .{
+            .vertices = try gpa.dupe(f32, obj_parsed.vertices),
+            .normals = try gpa.dupe(f32, obj_parsed.normals),
+        };
+        try self.mesh_attrs.append(gpa, mesh_attributes);
 
-        const material_offset: u32 = @intCast(materials.list.len);
-
-        // Add the materials.
-        for (0..scene.num_materials) |m| {
-            const material = scene.materials[m];
-            const name = std.mem.span(material.name);
-            if (materials.find(name)) |_| {
-                std.log.warn(
-                    "material with name '{s}' already exists, last defined in '{s}'",
-                    .{ name, filename },
-                );
-            }
-            const new: Material = .{
-                .tag = .blinn,
-                .extra_idx = @intCast(materials.blinn.items.len),
-                .name = try gpa.dupe(u8, std.mem.span(material.name)),
-            };
-            const blinn: Material.Blinn = .{
-                // TODO: Add support for the other obj file fields.
-                .ambient = material.ambient,
-                .diffuse = material.diffuse,
-                .specular = material.specular,
-                .mirror = @splat(material.metallic), // NOTE: There's no mirror field in the mtl repr.
-                .glossiness = 1 - material.roughness,
-            };
-            // FIX: Append a namespace or sort a merge strategy for materials names.
-            materials.list.appendAssumeCapacity(new);
-            materials.blinn.appendAssumeCapacity(blinn);
-        }
-
-        // Add the meshes.
-        for (0..scene.num_shapes) |s| {
-            const tobj_mesh = scene.shapes[s].mesh;
+        for (obj_parsed.meshes) |mesh_obj| {
             const mesh: Mesh = .{
                 .attrs = @intCast(self.mesh_attrs.items.len - 1),
-                .indices = try gpa.alloc(Mesh.Idx, tobj_mesh.num_indices),
+                .indices = try gpa.alloc(Mesh.Idx, mesh_obj.indices.len),
             };
-            for (0..tobj_mesh.num_indices / 3) |t| {
+            for (0..mesh_obj.indices.len / 3) |t| {
                 const first = t * 3;
                 inline for (0..3) |i|
                     mesh.indices[first + i] = .{
-                        .vertex = @intCast(tobj_mesh.indices[first + i].vertex_index),
-                        .normal = @intCast(tobj_mesh.indices[first + i].normal_index),
+                        .vertex = mesh_obj.indices[first + i].vertex,
+                        .normal = mesh_obj.indices[first + i].normal,
                     };
-                const material =
-                    if (tobj_mesh.material_ids[t] != -1)
-                        @as(u32, @intCast(tobj_mesh.material_ids[t])) + material_offset
-                    else
-                        0;
                 const new: Object = .{
                     .tag = .triangle,
                     .common = .{
                         .extra_idx = @intCast(self.triangles.items.len),
-                        .material = material,
+                        .material = 0,
                     },
                 };
                 const triangle: Mesh.Triangle = .{

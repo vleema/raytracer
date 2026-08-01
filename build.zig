@@ -26,6 +26,7 @@ pub fn build(b: *std.Build) void {
     // Setup zig build run that runs the main module executable.
     const run = b.addRunArtifact(exe);
     run.step.dependOn(b.getInstallStep());
+
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run.step);
 
@@ -50,38 +51,61 @@ pub fn build(b: *std.Build) void {
     check_step.dependOn(&exe_check.step);
     check_step.dependOn(&tests.step);
 
-    const libs = &.{
-        .{ .name = "vec", .path = "lib/vec.zig" },
-        .{ .name = "pre", .path = "lib/pre.zig" },
-        .{ .name = "ppm", .path = "lib/ppm.zig" },
+    var libraries = [_]Library{
+        .{ .name = "obj", .path = "lib/obj.zig", .imports = &.{"vec"} },
         .{ .name = "png", .path = "lib/png.zig" },
+        .{ .name = "ppm", .path = "lib/ppm.zig" },
+        .{ .name = "pre", .path = "lib/pre.zig" },
+        .{ .name = "vec", .path = "lib/vec.zig" },
     };
-
-    inline for (libs) |lib| {
-        addLib(b, mod, test_step, check_step, lib);
-    }
-
-    const obj = b.dependency("obj", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    mod.addImport("obj", obj.module("obj"));
+    createModulesAndTests(libraries.len, &libraries, b, target, optimize);
+    resolveImports(libraries.len, &libraries, b);
+    addLibraries(libraries.len, libraries, b, mod, test_step, check_step);
 }
 
-fn addLib(
+const Library = struct {
+    name: []const u8,
+    path: []const u8,
+    imports: []const []const u8 = &.{},
+    module: ?*std.Build.Module = null,
+    tests: ?*std.Build.Step.Compile = null,
+};
+
+fn createModulesAndTests(
+    n: comptime_int,
+    libraries: *[n]Library,
     b: *std.Build,
-    mod: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) void {
+    for (libraries) |*library| {
+        library.module = b.addModule(library.name, .{
+            .root_source_file = b.path(library.path),
+            .optimize = optimize,
+            .target = target,
+        });
+        library.tests = b.addTest(
+            .{ .root_module = library.module.? },
+        );
+    }
+}
+
+fn resolveImports(n: comptime_int, libraries: *[n]Library, b: *std.Build) void {
+    for (libraries) |*library| for (library.imports) |import|
+        library.module.?.addImport(import, b.modules.get(import).?);
+}
+
+fn addLibraries(
+    n: comptime_int,
+    libraries: [n]Library,
+    b: *std.Build,
+    main_module: *std.Build.Module,
     test_step: *std.Build.Step,
     check_step: *std.Build.Step,
-    opts: anytype,
 ) void {
-    const lib = b.addModule(opts.name, .{
-        .root_source_file = b.path(opts.path),
-        .target = mod.resolved_target.?,
-        .optimize = mod.optimize.?,
-    });
-    const tests = b.addTest(.{ .root_module = lib });
-    mod.addImport(opts.name, lib);
-    test_step.dependOn(&b.addRunArtifact(tests).step);
-    check_step.dependOn(&tests.step);
+    for (libraries) |library| {
+        main_module.addImport(library.name, library.module.?);
+        test_step.dependOn(&b.addRunArtifact(library.tests.?).step);
+        check_step.dependOn(&library.tests.?.step);
+    }
 }
