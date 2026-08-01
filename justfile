@@ -31,6 +31,9 @@ run-release scene="scene.zon":
 test:
     zig build test --summary all --error-style minimal_clear
 
+docs:
+    zig build docs
+
 # Runs zlint into the project.
 lint:
     zlint

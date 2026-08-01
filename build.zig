@@ -35,6 +35,23 @@ pub fn build(b: *std.Build) void {
         run.addArgs(args);
     }
 
+    const docs_mod = b.addModule("docs", .{
+        .root_source_file = b.path("src/docs.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const docs_artifact = b.addObject(.{
+        .name = "docs",
+        .root_module = docs_mod,
+    });
+    const docs = b.addInstallDirectory(.{
+        .source_dir = docs_artifact.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "docs",
+    });
+    const docs_step = b.step("docs", "Generate documentation");
+    docs_step.dependOn(&docs.step);
+
     // Setup zig build tests cmd that runs all tests in the root_module.
     const tests = b.addTest(.{ .root_module = mod });
     const run_tests = b.addRunArtifact(tests);
@@ -60,7 +77,7 @@ pub fn build(b: *std.Build) void {
     };
     createModulesAndTests(libraries.len, &libraries, b, target, optimize);
     resolveImports(libraries.len, &libraries, b);
-    addLibraries(libraries.len, libraries, b, mod, test_step, check_step);
+    addLibraries(libraries.len, libraries, b, mod, docs_mod, test_step, check_step);
 }
 
 const Library = struct {
@@ -100,11 +117,13 @@ fn addLibraries(
     libraries: [n]Library,
     b: *std.Build,
     main_module: *std.Build.Module,
+    docs_module: *std.Build.Module,
     test_step: *std.Build.Step,
     check_step: *std.Build.Step,
 ) void {
     for (libraries) |library| {
         main_module.addImport(library.name, library.module.?);
+        docs_module.addImport(library.name, library.module.?);
         test_step.dependOn(&b.addRunArtifact(library.tests.?).step);
         check_step.dependOn(&library.tests.?.step);
     }
