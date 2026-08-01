@@ -30,13 +30,12 @@ pub fn cross3(
     u: @Vector(3, T),
     v: @Vector(3, T),
 ) @Vector(3, T) {
-    const u_yzx = @Vector(3, T){ u[1], u[2], u[0] };
-    const v_yzx = @Vector(3, T){ v[1], v[2], v[0] };
-    const u_zxy = @Vector(3, T){ u[2], u[0], u[1] };
-    const v_zxy = @Vector(3, T){ v[2], v[0], v[1] };
-
-    return u_yzx * v_zxy - u_zxy * v_yzx;
+    const u_yzx = @shuffle(T, u, u, @Vector(3, T){ 1, 2, 0 });
+    const v_yzx = @shuffle(T, v, v, @Vector(3, T){ 1, 2, 0 });
+    const tmp = @mulAdd(@Vector(3, T), u, v_yzx, -(u_yzx * v));
+    return @shuffle(T, tmp, tmp, @Vector(3, T){ 1, 2, 0 });
 }
+
 
 /// Executes a dot product between the vectors `u` and `v`.
 ///
@@ -140,6 +139,13 @@ test "cross3: standard basis" {
     const z = @Vector(3, f32){ 0, 0, 1 };
     const result = cross3(f32, x, y);
     try testing.expectEqual(z, result);
+}
+
+test "cross3: arbitrary vectors" {
+    const u = @Vector(3, f32){ 1, 2, 3 };
+    const v = @Vector(3, f32){ 4, 5, 6 };
+    const result = cross3(f32, u, v);
+    try testing.expectEqual(@Vector(3, f32){ -3, 6, -3 }, result);
 }
 
 test "cross3: anticommutative" {
