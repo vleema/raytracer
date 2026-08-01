@@ -27,9 +27,7 @@ pub fn normalize(
     return vec / @as(@Vector(N, T), @splat(l));
 }
 
-/// Executes a cross product in two 3 dimensional vectors.
-///
-/// Returns the resulting vector.
+/// Executes a cross product of 3 dimensional vectors.
 pub fn cross3(
     T: type,
     u: @Vector(3, T),
@@ -41,10 +39,16 @@ pub fn cross3(
     return @shuffle(T, tmp, tmp, @Vector(3, T){ 1, 2, 0 });
 }
 
+/// Calculates the cross product of 2 dimensional vectors.
+pub fn cross2(
+    T: type,
+    u: [2]T,
+    v: [2]T,
+) T {
+    return u[0] * v[1] - u[1] * v[0];
+}
 
 /// Executes a dot product between the vectors `u` and `v`.
-///
-/// Returns the resulting scalar.
 pub fn dot(
     N: comptime_int,
     T: type,
