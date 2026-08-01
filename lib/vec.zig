@@ -6,9 +6,14 @@ pub fn Real(N: comptime_int) type {
     return @Vector(N, f32);
 }
 
-/// Calculates the length of the vector.
+/// Calculates the length of a vector.
 pub fn len(N: comptime_int, T: type, vec: @Vector(N, T)) T {
-    return @sqrt(@reduce(.Add, vec * vec));
+    return @sqrt(len_squared(N, T, vec));
+}
+
+/// Calculates the squared length of a vector.
+pub fn len_squared(N: comptime_int, T: type, vec: @Vector(N, T)) T {
+    return @reduce(.Add, vec * vec);
 }
 
 /// Normalizes a vector, i.e. divides is elements by it's size and returns the resulting vector.
