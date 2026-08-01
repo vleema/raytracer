@@ -16,10 +16,8 @@ pub fn main(init: std.process.Init) !void {
         std.mem.span(init.minimal.args.vector[1])
     else
         "scene.zon";
-    var rt = raytracer.RT3.fromZonFile(allocator, io, cwd, scene_file) catch |err| {
-        std.log.err("unable to parse scene description: {any}", .{err});
-        std.process.exit(1);
-    };
+
+    var rt = raytracer.RT3.fromZonFile(allocator, io, cwd, scene_file) catch std.process.exit(1);
     try rt.render(allocator, io, cwd);
 }
 
