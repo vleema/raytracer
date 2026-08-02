@@ -1,7 +1,12 @@
 .{
     .name = .raytracer,
     .version = "0.0.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .zlint = .{
+            .url = "git+https://github.com/vleema/zlint#4fe2c493d5b43af30f224a82a2946951fb879335",
+            .hash = "zlint-0.9.1-6ZchDq8iDgC4FTk7gqRKxlyKwAOmb3RiydmxIQaKOWNt",
+        },
+    },
     .fingerprint = 0x21c65cb5aaa9500a, // Changing this has security and trust implications.
     .minimum_zig_version = "0.16.0",
     .paths = .{

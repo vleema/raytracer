@@ -1,4 +1,6 @@
 const std = @import("std");
+const builtin = @import("builtin");
+const OptimizeMode = std.builtin.OptimizeMode;
 
 // Although this function looks imperative, it does not perform the build
 // directly and instead it mutates the build graph (`b`) that will be then
@@ -30,11 +32,12 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run.step);
 
-    // Pass args addd after `zig build run --` to the executable.
+    // Pass args after `zig build run --` to the executable.
     if (b.args) |args| {
         run.addArgs(args);
     }
 
+    // Setup documentation step.
     const docs_mod = b.addModule("docs", .{
         .root_source_file = b.path("src/docs.zig"),
         .target = target,
@@ -59,12 +62,28 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&run_tests.step);
 
+    // Setup lint step.
+    const zlint = b.dependency("zlint", .{
+        .target = target,
+        .optimize = OptimizeMode.ReleaseSafe,
+    });
+    const zlint_exe = zlint.artifact("zlint");
+    const zlint_run = b.addRunArtifact(zlint_exe);
+
+    // Pass args after `zig build lint --` to the executable.
+    if (b.args) |args| {
+        zlint_run.addArgs(args);
+    }
+
+    const lint_step = b.step("lint", "Lint the project with zlint");
+    lint_step.dependOn(&zlint_run.step);
+
     // Setup zls for build on save.
     const exe_check = b.addExecutable(.{
         .name = "check",
         .root_module = mod,
     });
-    const check_step = b.step("check", "Check if raytracer compiles");
+    const check_step = b.step("check", "Checks if raytracer compiles");
     check_step.dependOn(&exe_check.step);
     check_step.dependOn(&tests.step);
 

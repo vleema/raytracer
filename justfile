@@ -36,4 +36,4 @@ docs:
 
 # Runs zlint into the project.
 lint:
-    zlint
+    zig build lint
