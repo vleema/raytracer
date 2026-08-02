@@ -1,28 +1,15 @@
 {
-  description = "Raytracer made in zig";
+  description = "Flake for building the raytracer package and development environment";
 
-  inputs = {
-    nixpkgs.url = "nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-  };
+  inputs.nixpkgs.url = "nixpkgs/nixpkgs-unstable";
 
-  outputs = {
-    nixpkgs,
-    flake-utils,
-    ...
-  }: let
+  outputs = {nixpkgs, ...}: let
     inherit (nixpkgs) lib;
 
-    pname = "raytracer-zig";
-    version = "0.0.1";
-    meta = {
-      description = "Raytracer made from scratch using zig";
-      homepage = "https://codeberg.org/vleema/raytracer-zig";
-      mainProgram = "raytracer-zig";
-      license = lib.licenses.bsd3;
-    };
+    supportedSystems = ["x86_64-linux"];
+    forEachSystem = f: lib.foldl' lib.recursiveUpdate {} (map f supportedSystems);
+
     src = builtins.path {
-      name = pname;
       path = ./.;
       filter = path: type:
         type
@@ -30,51 +17,48 @@
         || (baseNameOf path == "justfile")
         || (builtins.match ".*\.(zig|zon)" path != null);
     };
+    pname = "raytracer-zig";
+    version = "0.0.1";
+    meta = {
+      description = "Raytracer made from scratch using zig";
+      homepage = "https://codeberg.org/vleema/raytracer-zig";
+      mainProgram = "raytracer";
+      license = lib.licenses.bsd3;
+    };
   in
-    flake-utils.lib.eachDefaultSystem (
+    forEachSystem (
       system: let
         pkgs = import nixpkgs {inherit system;};
+        zig = pkgs.zig_0_16;
+        deps = zig.fetchDeps {
+          inherit pname version src;
+          hash = "sha256-8mRPfj76UedMZPdJqnP8yp9wPZP2GXtacchIZS2HGcU=";
+        };
         buildInputs = [];
-        nativeBuildInputs = with pkgs; [zig_0_16 just];
+        nativeBuildInputs = [zig];
+        postConfigure = ''
+          ln -s ${deps} "$ZIG_GLOBAL_CACHE_DIR/p"
+        '';
       in {
         # nix develop
-        devShells = {
+        devShells.${system} = {
           default = pkgs.mkShell {
             inherit buildInputs nativeBuildInputs;
-            packages = with pkgs; [
-              zls
-              zig-zlint
-              zigimports
-            ];
+            packages = with pkgs; [zls just];
           };
         };
         # nix build
-        packages = {
+        packages.${system} = {
           default = pkgs.stdenv.mkDerivation {
-            inherit version src meta buildInputs nativeBuildInputs;
+            inherit version src meta buildInputs nativeBuildInputs postConfigure;
             name = pname;
-            buildPhase = ''
-              export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-              ls
-              just build-release
-            '';
           };
         };
         # nix flake check
-        checks = {
+        checks.${system} = {
           tests = pkgs.stdenv.mkDerivation {
-            inherit version src buildInputs nativeBuildInputs;
+            inherit version src buildInputs nativeBuildInputs postConfigure;
             pname = "${pname}-tests";
-            buildPhase = ''
-              export ZIG_GLOBAL_CACHE_DIR=$(mktemp -d)
-              just test
-            '';
-          };
-          lint = pkgs.stdenv.mkDerivation {
-            inherit version src buildInputs;
-            pname = "${pname}-lint";
-            nativeBuildInputs = with pkgs; [zig-zlint] ++ nativeBuildInputs;
-            buildPhase = "just lint";
           };
         };
       }
