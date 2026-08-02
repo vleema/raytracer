@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const raytracer = @import("raytracer.zig");
+const rt = @import("raytracer");
 
 // TODO: Implement utilities for specifying raytracer options, i.e.
 // - Number of threads on the cpu.
@@ -17,10 +17,8 @@ pub fn main(init: std.process.Init) !void {
     else
         "scene.zon";
 
-    var rt = raytracer.RT3.fromZonFile(allocator, io, cwd, scene_file) catch std.process.exit(1);
-    try rt.render(allocator, io, cwd);
-}
+    var config = rt.Config.fromZonFile(allocator, io, cwd, scene_file) catch
+        std.process.fatal("error parsing config file: '{s}'", .{scene_file});
 
-test {
-    std.testing.refAllDecls(@This());
+    try config.render(allocator, io, cwd);
 }

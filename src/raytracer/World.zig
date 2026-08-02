@@ -7,7 +7,6 @@ const pre = @import("pre");
 
 const Bvh = @import("Bvh.zig");
 const Color = @import("Color.zig");
-const lerp = @import("lerp.zig");
 const Light = @import("Light.zig");
 const Material = @import("Material.zig");
 const Object = @import("Object.zig");
@@ -25,7 +24,7 @@ bvh: Bvh = .{},
 
 const Aggregator = enum { bvh, list };
 
-pub fn deinit(self: *@This(), gpa: Allocator) void {
+pub fn deinit(self: *World, gpa: Allocator) void {
     self.objects.deinit(gpa);
     self.materials.deinit(gpa);
     self.lights.deinit(gpa);
@@ -155,15 +154,15 @@ const Background = union(enum) {
         br: Color = .{},
     },
 
-    pub fn ptColor(self: *const @This(), width: u32, height: u32, pt: [2]f32) Color {
+    pub fn pointColor(self: *const @This(), width: u32, height: u32, point: [2]f32) Color {
         return switch (self.*) {
             .single_color => |b| b.color,
-            .four_colors => |b| lerp.bilerp(
-                .{ .pos = .{ 0, 0 }, .color = b.tl },
-                .{ .pos = .{ width, 0 }, .color = b.tr },
-                .{ .pos = .{ 0, height }, .color = b.bl },
-                .{ .pos = .{ width, height }, .color = b.br },
-                pt,
+            .four_colors => |b| Color.Pixel.interpolate(
+                .{ .position = .{ 0, 0 }, .color = b.tl },
+                .{ .position = .{ width, 0 }, .color = b.tr },
+                .{ .position = .{ 0, height }, .color = b.bl },
+                .{ .position = .{ width, height }, .color = b.br },
+                point,
             ),
         };
     }

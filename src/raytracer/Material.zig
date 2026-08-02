@@ -23,7 +23,7 @@ pub const List = struct {
     blinn: ArrayList(Blinn) = .empty,
     flat: ArrayList(Flat) = .empty,
 
-    pub fn deinit(self: *@This(), gpa: Allocator) void {
+    pub fn deinit(self: *List, gpa: Allocator) void {
         for (self.list.items(.name)) |n| gpa.free(n);
         self.list.deinit(gpa);
         self.blinn.deinit(gpa);

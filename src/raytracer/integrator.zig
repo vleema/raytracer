@@ -70,7 +70,7 @@ pub const Integrator = union(enum) {
                     self.li(world, ray, h, 0)
                 else
                     // TODO: Add texture background.
-                    world.background.ptColor(
+                    world.background.pointColor(
                         img_width,
                         img_height,
                         .{ @floatFromInt(x), @floatFromInt(y) },
